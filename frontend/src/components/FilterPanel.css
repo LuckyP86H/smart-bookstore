@@ -1,0 +1,81 @@
+/* Reference the main CSS file for @apply support with custom theme */
+@import "../index.css" reference;
+
+/* ============================================
+   FILTER PANEL - RESPONSIVE WITH DARK MODE
+   ============================================ */
+
+.filter-panel {
+  @apply w-full lg:w-72 lg:min-w-[280px];
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-2xl;
+  @apply shadow-soft dark:shadow-none dark:border dark:border-gray-700;
+  @apply p-4 md:p-6;
+  @apply h-fit;
+  @apply lg:sticky lg:top-24;
+}
+
+.filter-panel h3 {
+  @apply text-lg font-semibold;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply mb-4 md:mb-6;
+}
+
+.filter-group {
+  @apply mb-4;
+}
+
+.filter-group label {
+  @apply block mb-2;
+  @apply text-sm font-medium;
+  @apply text-gray-600 dark:text-gray-400;
+}
+
+.filter-group input,
+.filter-group select {
+  @apply w-full;
+  @apply px-3 py-2.5;
+  @apply bg-gray-50 dark:bg-gray-700;
+  @apply border-2 border-gray-200 dark:border-gray-600;
+  @apply rounded-lg;
+  @apply text-sm;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply placeholder-gray-400 dark:placeholder-gray-500;
+  @apply focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+  @apply transition-all duration-200;
+}
+
+.filter-group select {
+  @apply cursor-pointer;
+  @apply appearance-none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+}
+
+.filter-group input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.filter-group input[type="number"]::-webkit-outer-spin-button,
+.filter-group input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.btn-clear-filters {
+  @apply w-full mt-4;
+  @apply py-2.5 px-4;
+  @apply bg-transparent;
+  @apply text-primary-600 dark:text-primary-400;
+  @apply border-2 border-primary-500 dark:border-primary-400;
+  @apply rounded-lg;
+  @apply font-semibold text-sm;
+  @apply cursor-pointer;
+  @apply hover:bg-primary-600 hover:text-white hover:border-primary-600;
+  @apply dark:hover:bg-primary-600 dark:hover:text-white;
+  @apply transition-colors duration-200;
+}

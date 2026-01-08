@@ -1,0 +1,195 @@
+/* Reference the main CSS file for @apply support with custom theme */
+@import "./index.css" reference;
+
+/* ============================================
+   BOOKSTORE - MODERN RESPONSIVE DESIGN
+   With Light/Dark Mode Support
+   ============================================ */
+
+/* ============================================
+   LOGIN PAGE
+   ============================================ */
+.login-container {
+  @apply min-h-screen flex items-center justify-center p-4;
+  @apply bg-linear-to-br from-primary-500 via-primary-600 to-accent-600;
+  @apply dark:from-gray-900 dark:via-gray-800 dark:to-gray-900;
+}
+
+.login-box {
+  @apply w-full max-w-md p-8 md:p-10;
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-2xl shadow-soft-lg;
+  @apply text-center;
+}
+
+.login-box h1 {
+  @apply text-3xl md:text-4xl font-bold mb-2;
+  @apply bg-linear-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
+}
+
+.login-box .subtitle {
+  @apply text-gray-500 dark:text-gray-400 mb-6;
+}
+
+.login-box form {
+  @apply flex flex-col gap-4;
+}
+
+.login-box input {
+  @apply w-full px-4 py-3;
+  @apply bg-gray-50 dark:bg-gray-700;
+  @apply border-2 border-gray-200 dark:border-gray-600;
+  @apply rounded-xl text-base;
+  @apply text-gray-900 dark:text-white;
+  @apply placeholder-gray-400 dark:placeholder-gray-500;
+  @apply focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+  @apply transition-all duration-200;
+}
+
+.login-box button[type="submit"] {
+  @apply w-full py-3 mt-2;
+  @apply bg-linear-to-r from-primary-600 to-accent-500;
+  @apply hover:from-primary-700 hover:to-accent-600;
+  @apply text-white font-semibold text-base;
+  @apply rounded-xl;
+  @apply transform hover:-translate-y-0.5 active:translate-y-0;
+  @apply transition-all duration-200;
+  @apply shadow-lg hover:shadow-xl;
+  @apply cursor-pointer border-none;
+}
+
+.login-box .btn-secondary {
+  @apply w-full py-2.5 mt-1;
+  @apply bg-transparent;
+  @apply border-2 border-gray-300 dark:border-gray-600;
+  @apply text-gray-600 dark:text-gray-300;
+  @apply font-medium text-sm;
+  @apply rounded-xl;
+  @apply hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400;
+  @apply transition-all duration-200;
+  @apply cursor-pointer;
+}
+
+.resume-hint {
+  @apply text-sm text-gray-400 dark:text-gray-500;
+  @apply -mt-4 mb-6;
+}
+
+.test-accounts {
+  @apply mt-6 p-4;
+  @apply bg-gray-50 dark:bg-gray-700/50;
+  @apply rounded-xl text-sm;
+  @apply text-gray-600 dark:text-gray-300;
+}
+
+.test-accounts p {
+  @apply py-1;
+}
+
+.test-accounts strong {
+  @apply text-primary-600 dark:text-primary-400;
+}
+
+/* ============================================
+   MAIN APP LAYOUT
+   ============================================ */
+.app {
+  @apply min-h-screen flex flex-col;
+  @apply bg-gray-50 dark:bg-gray-900;
+}
+
+/* Header */
+header {
+  @apply sticky top-0 z-50;
+  @apply bg-white/80 dark:bg-gray-800/80;
+  @apply backdrop-blur-lg;
+  @apply border-b border-gray-200 dark:border-gray-700;
+  @apply px-4 md:px-6 lg:px-8 py-4;
+  @apply flex flex-wrap items-center justify-between gap-4;
+}
+
+header h1 {
+  @apply text-xl md:text-2xl font-bold;
+  @apply bg-linear-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
+}
+
+.header-right {
+  @apply flex items-center gap-3 md:gap-4;
+}
+
+.header-right span {
+  @apply text-sm md:text-base;
+  @apply text-gray-600 dark:text-gray-300;
+  @apply hidden sm:block;
+}
+
+.header-right button {
+  @apply px-4 py-2;
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply hover:bg-gray-200 dark:hover:bg-gray-600;
+  @apply text-gray-700 dark:text-gray-200;
+  @apply font-medium text-sm;
+  @apply rounded-lg;
+  @apply transition-colors duration-200;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  @apply p-2 rounded-lg;
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply hover:bg-gray-200 dark:hover:bg-gray-600;
+  @apply text-gray-600 dark:text-gray-300;
+  @apply transition-colors duration-200;
+}
+
+/* Main Content */
+.main-content {
+  @apply flex-1;
+  @apply flex flex-col lg:flex-row;
+  @apply gap-4 lg:gap-6;
+  @apply p-4 md:p-6 lg:p-8;
+  @apply max-w-[1800px] mx-auto w-full;
+}
+
+.content-area {
+  @apply flex-1;
+  @apply flex flex-col xl:flex-row;
+  @apply gap-4 lg:gap-6;
+  @apply min-w-0;
+}
+
+/* Books Section */
+.books-section {
+  @apply flex-1 min-w-0;
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-2xl;
+  @apply shadow-soft dark:shadow-none dark:border dark:border-gray-700;
+  @apply p-4 md:p-6;
+}
+
+.books-section h2 {
+  @apply text-lg md:text-xl font-semibold;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply mb-4 md:mb-6;
+}
+
+.books-grid {
+  @apply grid gap-4 md:gap-6;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Error State */
+.error {
+  @apply p-4 rounded-xl;
+  @apply bg-red-50 dark:bg-red-900/20;
+  @apply text-red-600 dark:text-red-400;
+  @apply border border-red-200 dark:border-red-800;
+  @apply my-4;
+}
+
+/* No Books State */
+.no-books {
+  @apply text-center py-12;
+  @apply text-gray-400 dark:text-gray-500;
+  @apply text-lg;
+}

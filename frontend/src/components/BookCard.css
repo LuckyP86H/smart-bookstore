@@ -1,0 +1,153 @@
+/* Reference the main CSS file for @apply support with custom theme */
+@import "../index.css" reference;
+
+/* ============================================
+   BOOK CARD - RESPONSIVE WITH DARK MODE
+   ============================================ */
+
+.book-card {
+  @apply flex flex-col;
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-xl;
+  @apply shadow-soft dark:shadow-none;
+  @apply border border-transparent dark:border-gray-700;
+  @apply overflow-hidden;
+  @apply transform hover:-translate-y-1;
+  @apply transition-all duration-300;
+  @apply hover:shadow-soft-lg dark:hover:border-primary-500/50;
+}
+
+.book-cover {
+  @apply w-full h-48 md:h-56;
+  @apply object-cover;
+  @apply bg-gray-100 dark:bg-gray-700;
+}
+
+.book-info {
+  @apply p-4 md:p-5;
+  @apply flex-1 flex flex-col;
+}
+
+.book-title {
+  @apply text-base md:text-lg font-semibold;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply leading-snug mb-1;
+  @apply line-clamp-2;
+}
+
+.book-author {
+  @apply text-sm;
+  @apply text-gray-500 dark:text-gray-400;
+  @apply italic mb-2;
+}
+
+.book-genre {
+  @apply inline-block;
+  @apply px-3 py-1;
+  @apply text-xs font-medium;
+  @apply bg-primary-100 dark:bg-primary-900/30;
+  @apply text-primary-700 dark:text-primary-300;
+  @apply rounded-full;
+  @apply mb-3;
+  @apply capitalize;
+  @apply w-fit;
+}
+
+.book-rating {
+  @apply flex items-center gap-1;
+  @apply mb-3;
+}
+
+.star {
+  @apply text-lg;
+  @apply text-gray-300 dark:text-gray-600;
+}
+
+.star.filled {
+  @apply text-amber-400;
+}
+
+.rating-value {
+  @apply text-sm;
+  @apply text-gray-500 dark:text-gray-400;
+  @apply ml-1;
+}
+
+.book-meta {
+  @apply flex justify-between items-center;
+  @apply p-3;
+  @apply bg-gray-50 dark:bg-gray-700/50;
+  @apply rounded-lg;
+  @apply mb-3;
+}
+
+.book-price {
+  @apply text-xl md:text-2xl font-bold;
+  @apply text-primary-600 dark:text-primary-400;
+}
+
+.book-stock {
+  @apply text-xs font-semibold;
+  @apply text-emerald-600 dark:text-emerald-400;
+}
+
+.book-stock.out-of-stock {
+  @apply text-red-600 dark:text-red-400;
+}
+
+.book-stock.low-stock {
+  @apply text-amber-600 dark:text-amber-400;
+}
+
+.cart-indicator {
+  @apply text-xs font-medium;
+  @apply text-primary-600 dark:text-primary-400;
+  @apply bg-primary-50 dark:bg-primary-900/30;
+  @apply px-2 py-1 rounded;
+  @apply text-center mb-2;
+}
+
+.book-description {
+  @apply text-sm leading-relaxed;
+  @apply text-gray-600 dark:text-gray-400;
+  @apply mb-4 flex-1;
+  @apply line-clamp-3;
+}
+
+.book-actions {
+  @apply grid grid-cols-2 gap-2;
+  @apply mt-auto;
+}
+
+.btn-buy-now,
+.btn-add-cart {
+  @apply py-2.5 px-3;
+  @apply text-sm font-semibold;
+  @apply rounded-lg;
+  @apply transition-all duration-200;
+  @apply cursor-pointer;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-buy-now {
+  @apply bg-gradient-to-r from-primary-600 to-accent-500;
+  @apply text-white;
+  @apply hover:from-primary-700 hover:to-accent-600;
+  @apply hover:-translate-y-0.5 hover:shadow-lg;
+  @apply disabled:hover:translate-y-0 disabled:hover:shadow-none;
+  @apply border-none;
+}
+
+.btn-add-cart {
+  @apply bg-transparent;
+  @apply text-primary-600 dark:text-primary-400;
+  @apply border-2 border-primary-500 dark:border-primary-400;
+  @apply hover:bg-primary-600 hover:text-white hover:border-primary-600;
+  @apply dark:hover:bg-primary-600 dark:hover:text-white;
+}
+
+.book-sold {
+  @apply text-center mt-3;
+  @apply text-sm font-semibold;
+  @apply text-orange-500 dark:text-orange-400;
+}

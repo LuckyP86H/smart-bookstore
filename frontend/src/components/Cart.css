@@ -1,0 +1,125 @@
+/* Reference the main CSS file for @apply support with custom theme */
+@import "../index.css" reference;
+
+/* ============================================
+   CART - RESPONSIVE WITH DARK MODE
+   ============================================ */
+
+.cart {
+  @apply w-full xl:w-80 xl:min-w-[320px];
+  @apply bg-white dark:bg-gray-800;
+  @apply rounded-2xl;
+  @apply shadow-soft dark:shadow-none dark:border dark:border-gray-700;
+  @apply p-4 md:p-6;
+  @apply h-fit;
+  @apply xl:sticky xl:top-24;
+}
+
+.cart h2 {
+  @apply text-lg font-semibold;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply mb-4;
+}
+
+.cart-empty {
+  @apply text-center py-8;
+  @apply text-gray-400 dark:text-gray-500;
+}
+
+.cart-items {
+  @apply max-h-96 overflow-y-auto;
+  @apply mb-4;
+  @apply space-y-0;
+}
+
+.cart-item {
+  @apply py-4;
+  @apply border-b border-gray-100 dark:border-gray-700;
+  @apply last:border-b-0;
+}
+
+.cart-item-info h4 {
+  @apply text-sm font-medium;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply mb-1 line-clamp-1;
+}
+
+.cart-item-author {
+  @apply text-xs;
+  @apply text-gray-500 dark:text-gray-400;
+  @apply mb-2;
+}
+
+.cart-item-price {
+  @apply text-base font-bold;
+  @apply text-primary-600 dark:text-primary-400;
+  @apply mb-3;
+}
+
+.cart-item-actions {
+  @apply flex justify-between items-center;
+}
+
+.quantity-controls {
+  @apply flex items-center gap-2;
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply rounded-lg p-1;
+}
+
+.quantity-controls button {
+  @apply w-7 h-7;
+  @apply flex items-center justify-center;
+  @apply bg-white dark:bg-gray-600;
+  @apply border-none rounded-md;
+  @apply text-primary-600 dark:text-primary-400;
+  @apply font-bold text-lg;
+  @apply cursor-pointer;
+  @apply hover:bg-primary-600 hover:text-white;
+  @apply dark:hover:bg-primary-500;
+  @apply transition-colors duration-200;
+  @apply disabled:opacity-30 disabled:cursor-not-allowed;
+  @apply disabled:hover:bg-white dark:disabled:hover:bg-gray-600;
+  @apply disabled:hover:text-primary-600 dark:disabled:hover:text-primary-400;
+}
+
+.quantity-controls span {
+  @apply min-w-[24px] text-center;
+  @apply font-semibold text-sm;
+  @apply text-gray-800 dark:text-gray-100;
+}
+
+.btn-remove {
+  @apply px-3 py-1.5;
+  @apply bg-transparent;
+  @apply text-red-500 dark:text-red-400;
+  @apply border border-red-300 dark:border-red-500;
+  @apply rounded-lg;
+  @apply text-xs font-medium;
+  @apply cursor-pointer;
+  @apply hover:bg-red-500 hover:text-white hover:border-red-500;
+  @apply transition-colors duration-200;
+}
+
+.cart-footer {
+  @apply pt-4;
+  @apply border-t-2 border-gray-100 dark:border-gray-700;
+}
+
+.cart-total {
+  @apply flex justify-between;
+  @apply text-lg font-bold;
+  @apply text-gray-800 dark:text-gray-100;
+  @apply mb-4;
+}
+
+.btn-checkout {
+  @apply w-full py-3;
+  @apply bg-gradient-to-r from-primary-600 to-accent-500;
+  @apply hover:from-primary-700 hover:to-accent-600;
+  @apply text-white font-semibold;
+  @apply border-none rounded-xl;
+  @apply cursor-pointer;
+  @apply transform hover:-translate-y-0.5;
+  @apply transition-all duration-200;
+  @apply shadow-lg hover:shadow-xl;
+}

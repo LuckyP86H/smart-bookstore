@@ -1,0 +1,282 @@
+syntax = "proto3";
+
+package bookstore.v1;
+
+option go_package = "github.com/pxu/bookstore/gen;bookstorev1";
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum Genre {
+  GENRE_UNSPECIFIED = 0;
+  FICTION = 1;
+  NON_FICTION = 2;
+  SCIENCE = 3;
+  HISTORY = 4;
+  BIOGRAPHY = 5;
+  MYSTERY = 6;
+  ROMANCE = 7;
+  FANTASY = 8;
+  SCIENCE_FICTION = 9;
+  THRILLER = 10;
+  HORROR = 11;
+  SELF_HELP = 12;
+  BUSINESS = 13;
+  TECHNOLOGY = 14;
+  CHILDREN = 15;
+}
+
+enum SortOrder {
+  SORT_ORDER_UNSPECIFIED = 0;
+  PRICE_ASC = 1;
+  PRICE_DESC = 2;
+  TITLE_ASC = 3;
+  TITLE_DESC = 4;
+  RATING_DESC = 5;
+  PUBLICATION_YEAR_DESC = 6;
+}
+
+// ============================================================================
+// Core Messages
+// ============================================================================
+
+message Book {
+  int64 id = 1;
+  int64 store_id = 2;
+  string isbn = 3;
+  string title = 4;
+  string author = 5;
+  Genre genre = 6;
+  string publisher = 7;
+  int32 publication_year = 8;
+  int32 page_count = 9;
+  string language = 10;
+  string cover_image_url = 11;
+  string description = 12;
+  double price = 13;
+  int32 stock_quantity = 14;
+  int32 total_sold = 15;
+  double average_rating = 16;
+  string created_at = 17;
+  string store_name = 18;
+}
+
+message Review {
+  int64 id = 1;
+  int64 book_id = 2;
+  int64 customer_id = 3;
+  string customer_name = 4;
+  int32 rating = 5;
+  string review_text = 6;
+  string created_at = 7;
+}
+
+message Sale {
+  int64 id = 1;
+  int64 book_id = 2;
+  string book_title = 3;
+  int64 customer_id = 4;
+  string customer_name = 5;
+  int32 quantity = 6;
+  double price_at_purchase = 7;
+  string purchased_at = 8;
+}
+
+// ============================================================================
+// Merchant Service Messages
+// ============================================================================
+
+message AddBookRequest {
+  string isbn = 1;
+  string title = 2;
+  string author = 3;
+  Genre genre = 4;
+  string publisher = 5;
+  int32 publication_year = 6;
+  int32 page_count = 7;
+  string language = 8;
+  string cover_image_url = 9;
+  string description = 10;
+  double price = 11;
+  int32 stock_quantity = 12;
+}
+
+message AddBookResponse {
+  Book book = 1;
+}
+
+message RemoveBookRequest {
+  int64 book_id = 1;
+}
+
+message RemoveBookResponse {
+  string message = 1;
+}
+
+message UpdateStockRequest {
+  int64 book_id = 1;
+  int32 quantity_to_add = 2;
+}
+
+message UpdateStockResponse {
+  Book book = 1;
+}
+
+message GetMerchantBooksRequest {
+  bool include_sold_out = 1;
+}
+
+message GetMerchantBooksResponse {
+  repeated Book books = 1;
+}
+
+message GetSoldBooksRequest {
+  string start_date = 1;
+  string end_date = 2;
+}
+
+message GetSoldBooksResponse {
+  repeated Sale sales = 1;
+}
+
+message GetLowStockBooksRequest {
+  int32 threshold = 1;
+}
+
+message GetLowStockBooksResponse {
+  repeated Book books = 1;
+}
+
+// ============================================================================
+// Customer Service Messages
+// ============================================================================
+
+message GetAvailableBooksRequest {
+  string search_query = 1;
+  Genre genre_filter = 2;
+  string author_filter = 3;
+  double min_price = 4;
+  double max_price = 5;
+  SortOrder sort_order = 6;
+  int32 page = 7;
+  int32 page_size = 8;
+}
+
+message GetAvailableBooksResponse {
+  repeated Book books = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetBookDetailsRequest {
+  int64 book_id = 1;
+}
+
+message GetBookDetailsResponse {
+  Book book = 1;
+}
+
+message PurchaseBookRequest {
+  int64 book_id = 1;
+  int32 quantity = 2;
+}
+
+message PurchaseBookResponse {
+  string message = 1;
+  Sale sale = 2;
+}
+
+message CartItem {
+  int64 book_id = 1;
+  int32 quantity = 2;
+}
+
+message CheckoutCartRequest {
+  repeated CartItem items = 1;
+}
+
+message CheckoutCartResponse {
+  string message = 1;
+  repeated Sale sales = 2;
+}
+
+message AddReviewRequest {
+  int64 book_id = 1;
+  int32 rating = 2;
+  string review_text = 3;
+}
+
+message AddReviewResponse {
+  Review review = 1;
+}
+
+message GetBookReviewsRequest {
+  int64 book_id = 1;
+}
+
+message GetBookReviewsResponse {
+  repeated Review reviews = 1;
+}
+
+message GetPurchaseHistoryRequest {}
+
+message GetPurchaseHistoryResponse {
+  repeated Sale purchases = 1;
+}
+
+// ============================================================================
+// Google Books API Integration
+// ============================================================================
+
+message LookupBookByISBNRequest {
+  string isbn = 1;
+}
+
+message LookupBookByISBNResponse {
+  string title = 1;
+  string author = 2;
+  string publisher = 3;
+  int32 publication_year = 4;
+  int32 page_count = 5;
+  string description = 6;
+  string cover_image_url = 7;
+  repeated string categories = 8;
+}
+
+// ============================================================================
+// Services
+// ============================================================================
+
+service MerchantService {
+  // Book Management
+  rpc AddBook(AddBookRequest) returns (AddBookResponse);
+  rpc RemoveBook(RemoveBookRequest) returns (RemoveBookResponse);
+  rpc UpdateStock(UpdateStockRequest) returns (UpdateStockResponse);
+  
+  // Inventory Queries
+  rpc GetMerchantBooks(GetMerchantBooksRequest) returns (GetMerchantBooksResponse);
+  rpc GetSoldBooks(GetSoldBooksRequest) returns (GetSoldBooksResponse);
+  rpc GetLowStockBooks(GetLowStockBooksRequest) returns (GetLowStockBooksResponse);
+  
+  // External API
+  rpc LookupBookByISBN(LookupBookByISBNRequest) returns (LookupBookByISBNResponse);
+}
+
+service CustomerService {
+  // Browse and Search
+  rpc GetAvailableBooks(GetAvailableBooksRequest) returns (GetAvailableBooksResponse);
+  rpc GetBookDetails(GetBookDetailsRequest) returns (GetBookDetailsResponse);
+  
+  // Purchase Operations
+  rpc PurchaseBook(PurchaseBookRequest) returns (PurchaseBookResponse);
+  rpc CheckoutCart(CheckoutCartRequest) returns (CheckoutCartResponse);
+  
+  // Reviews
+  rpc AddReview(AddReviewRequest) returns (AddReviewResponse);
+  rpc GetBookReviews(GetBookReviewsRequest) returns (GetBookReviewsResponse);
+  
+  // Purchase History
+  rpc GetPurchaseHistory(GetPurchaseHistoryRequest) returns (GetPurchaseHistoryResponse);
+}

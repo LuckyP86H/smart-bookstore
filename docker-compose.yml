@@ -1,0 +1,122 @@
+# Docker Compose configuration for Bookstore application
+# This orchestrates three services: PostgreSQL database, Go backend, React frontend
+# 
+# Usage:
+#   docker-compose up -d        # Start all services in background
+#   docker-compose logs -f      # View logs
+#   docker-compose down         # Stop all services
+#   docker-compose down -v      # Stop and remove volumes (fresh start)
+
+services:
+  # PostgreSQL database service
+  database:
+    image: postgres:16-alpine
+    container_name: bookstore-db
+    restart: unless-stopped
+    
+    # Environment variables for PostgreSQL configuration
+    environment:
+      POSTGRES_DB: bookstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    
+    # Port mapping: host:container
+    # Using 5434 on host to avoid conflicts with other PostgreSQL instances
+    ports:
+      - "5434:5432"
+    
+    # Persist database data in a Docker volume
+    # This ensures data survives container restarts
+    volumes:
+      - bookstore-data:/var/lib/postgresql/data
+    
+    # Health check to ensure database is ready before starting backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    
+    # Internal network for service-to-service communication
+    networks:
+      - bookstore-network
+
+  # Go backend service with ConnectRPC
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bookstore-backend
+    restart: unless-stopped
+    
+    # Environment variables for backend configuration
+    environment:
+      DB_HOST: database              # Use service name for internal DNS
+      DB_PORT: 5432                  # Internal port (not host port)
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: bookstore
+      PORT: 8082
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}  # Optional API key
+    
+    # Port mapping: expose backend on host port 8082
+    ports:
+      - "8082:8082"
+    
+    # Wait for database to be healthy before starting
+    depends_on:
+      database:
+        condition: service_healthy
+    
+    # Health check for backend service
+    # ConnectRPC endpoints don't respond to simple GET requests
+    # So we just check if the process is running
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "bookstore-server"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    networks:
+      - bookstore-network
+
+  # React frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bookstore-frontend
+    restart: unless-stopped
+    
+    # Port mapping: expose frontend on host port 3000
+    ports:
+      - "3000:3000"
+    
+    # Wait for backend to be healthy before starting
+    # This isn't strictly necessary but provides better user experience
+    depends_on:
+      backend:
+        condition: service_healthy
+    
+    # Health check for frontend service
+    healthcheck:
+      test: ["CMD", "pgrep", "nginx"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    networks:
+      - bookstore-network
+
+# Docker volumes for persistent data
+volumes:
+  bookstore-data:
+    driver: local
+
+# Docker network for service communication
+# Services can reach each other by service name (e.g., "database", "backend")
+networks:
+  bookstore-network:
+    driver: bridge
