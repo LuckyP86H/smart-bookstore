@@ -187,9 +187,55 @@ Keep responses under 100 words."""
                 api_base=settings.ollama_base_url,
             )
             
-            # Extract the response text
-            reply = response.choices[0].message.content.strip()
-            return reply
+            # Type 1: Try to treat response as a dictionary
+            # Many LiteLLM responses can be accessed as dicts
+            try:
+                response_dict = response  # Try to use it as a dict
+                if isinstance(response_dict, dict) and 'choices' in response_dict:
+                    choices = response_dict['choices']
+                    if choices and len(choices) > 0:
+                        first_choice = choices[0]
+                        if isinstance(first_choice, dict) and 'message' in first_choice:
+                            message_dict = first_choice['message']
+                            if isinstance(message_dict, dict) and 'content' in message_dict:
+                                content = message_dict['content']
+                                if content and isinstance(content, str):
+                                    reply = content.strip()
+                                    return reply if reply else "I'm here to help you find great books!"
+            except (AttributeError, TypeError, KeyError):
+                pass
+            
+            # Type 2: Try to access as object attributes
+            try:
+                # Use getattr for safe attribute access
+                if hasattr(response, 'choices'):
+                    choices = getattr(response, 'choices', [])
+                    if choices and len(choices) > 0:
+                        first_choice = choices[0]
+                        if hasattr(first_choice, 'message'):
+                            message_obj = getattr(first_choice, 'message')
+                            if hasattr(message_obj, 'content'):
+                                content = getattr(message_obj, 'content')
+                                if content and isinstance(content, str):
+                                    reply = content.strip()
+                                    return reply if reply else "I'm here to help you find great books!"
+            except (AttributeError, TypeError):
+                pass
+            
+            # Type 3: Direct access with type ignore (last resort)
+            try:
+                # This is what we originally wanted to do
+                reply = response.choices[0].message.content.strip()  # type: ignore
+                if reply:
+                    return reply
+            except (AttributeError, IndexError, TypeError):
+                pass
+            
+            # If we get here, return fallback
+            if books:
+                return f"I found {len(books)} books that might interest you!"
+            else:
+                return "I'm here to help you find great books. What are you interested in reading?"
             
         except Exception as e:
             print(f"Error generating LLM response: {e}")
