@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pxu/bookstore/services"
+	"github.com/LuckyP86H/smart-bookstore/services"
 )
 
 // AIHandler handles AI-related HTTP endpoints
@@ -29,9 +29,9 @@ type ChatRequest struct {
 
 // ChatResponse represents chat response to frontend
 type ChatResponse struct {
-	Reply      string                   `json:"reply"`
+	Reply      string                        `json:"reply"`
 	Books      []services.BookRecommendation `json:"books"`
-	Confidence float64                  `json:"confidence"`
+	Confidence float64                       `json:"confidence"`
 }
 
 // HandleChat processes chat requests

@@ -3,7 +3,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 
 # LiteLLM for LLM provider abstraction
-litellm==1.56.10
+litellm==1.80.16
 
 # Sentence transformers for embeddings
 sentence-transformers==3.3.1
