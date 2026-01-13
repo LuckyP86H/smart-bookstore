@@ -15,6 +15,7 @@ import (
 	"github.com/pxu/bookstore/db"
 	"github.com/pxu/bookstore/external"
 	"github.com/pxu/bookstore/gen/bookstorev1connect"  // Auto-generated ConnectRPC service handlers
+	"github.com/pxu/bookstore/handlers"
 	"github.com/pxu/bookstore/interceptors"
 	"github.com/pxu/bookstore/services"
 )
@@ -28,6 +29,7 @@ func main() {
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "bookstore")
 	googleBooksAPIKey := getEnv("GOOGLE_BOOKS_API_KEY", "")
+	aiServiceURL := getEnv("AI_SERVICE_URL", "http://localhost:8000")
 	port := getEnv("PORT", "8082")
 
 	// Initialize database connection
@@ -77,6 +79,13 @@ func main() {
 	)
 	mux.Handle(customerPath, customerHandler)
 
+	// Register AI Service HTTP endpoints
+	// These are REST endpoints that communicate with the Python AI microservice
+	aiHandler := handlers.NewAIHandler(aiServiceURL)
+	mux.HandleFunc("/api/ai/chat", basicAuthMiddleware(database, aiHandler.HandleChat))
+	mux.HandleFunc("/api/ai/search/semantic", aiHandler.HandleSemanticSearch)  // No auth required for search
+	mux.HandleFunc("/api/ai/health", aiHandler.HandleHealth)
+
 	// Wrap with CORS middleware for browser access
 	// Allows frontend running on different origin (port 3000) to make requests
 	handler := corsMiddleware(mux)
@@ -98,6 +107,27 @@ func main() {
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+// basicAuthMiddleware wraps HTTP handlers with HTTP Basic Auth validation
+func basicAuthMiddleware(database *db.Database, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Bookstore"`)
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate credentials
+		if !database.ValidateCredentials(username, password) {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
+
+		// Continue to handler
+		next(w, r)
 	}
 }
 

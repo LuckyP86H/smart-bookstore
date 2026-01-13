@@ -1,6 +1,6 @@
-# 📚 Bookstore - ConnectRPC Learning Project
+# 📚 Bookstore - ConnectRPC + AI Learning Project
 
-A fullstack bookstore application built to learn modern gRPC development using **ConnectRPC**, **Go**, **React**, and **PostgreSQL**. This project demonstrates production-ready patterns for building type-safe APIs that work natively in browsers.
+A fullstack bookstore application built to learn modern gRPC development using **ConnectRPC**, **Go**, **React**, and **PostgreSQL**, enhanced with **AI-powered features** using **LLMs** and **vector search**. This project demonstrates production-ready patterns for building type-safe APIs that work natively in browsers, plus real-world AI integration.
 
 ## 🎯 Learning Objectives
 
@@ -8,6 +8,9 @@ This project teaches:
 - **ConnectRPC**: Modern, browser-friendly alternative to gRPC-Web
 - **Protocol Buffers**: Schema-first API design with code generation
 - **Go Backend**: Building efficient gRPC services
+- **AI Integration**: LLM-powered chat and semantic search
+- **Microservices**: REST communication between Go and Python services
+- **Vector Search**: Embeddings and similarity search with pgvector
 - **Type Safety**: End-to-end type safety from backend to frontend
 - **Authentication**: HTTP Basic Auth with interceptors
 - **Database Patterns**: ACID transactions and race condition handling
@@ -20,13 +23,33 @@ This project teaches:
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
 │  React Frontend │ ───▶ │  Go Backend      │ ───▶ │  PostgreSQL  │
-│  (Port 3000)    │      │  ConnectRPC      │      │  (Port 5434) │
-│                 │      │  (Port 8082)     │      │              │
-│  - TypeScript   │      │  - gRPC Services │      │  - Books     │
-│  - Vite         │      │  - Interceptors  │      │  - Reviews   │
-│  - ConnectRPC   │      │  - Google Books  │      │  - Sales     │
-│    Client       │      │    API           │      │              │
-└─────────────────┘      └──────────────────┘      └──────────────┘
+│  (Port 3000)    │      │  ConnectRPC      │      │  + pgvector  │
+│                 │      │  (Port 8082)     │      │  (Port 5434) │
+│  - TypeScript   │      │  - gRPC Services │      │              │
+│  - Vite         │      │  - Interceptors  │      │  - Books     │
+│  - ConnectRPC   │      │  - AI Handlers   │      │  - Reviews   │
+│    Client       │      │  - Google Books  │      │  - Sales     │
+│  - AI Chat UI   │      │    API           │      │  - Embeddings│
+└─────────────────┘      └────────┬─────────┘      └──────────────┘
+                                  │                         ▲
+                                  │ REST API                │
+                                  ▼                         │
+                         ┌──────────────────┐              │
+                         │  Python AI Svc   │──────────────┘
+                         │  FastAPI         │   pgvector
+                         │  (Port 8000)     │   queries
+                         │                  │
+                         │  - LiteLLM       │
+                         │  - Embeddings    │
+                         │  - Vector Search │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │  Ollama          │
+                         │  llama3.2 (2GB)  │
+                         │  (Port 11434)    │
+                         └──────────────────┘
 ```
 
 ### Technology Stack
@@ -40,7 +63,14 @@ This project teaches:
 | **Backend** | Go | 1.25.0 | High performance, great for gRPC |
 | | ConnectRPC Go | 1.19.1 | gRPC server framework |
 | | PostgreSQL Driver | latest | Database connectivity |
+| **AI Service** | Python | 3.11 | Best ecosystem for ML/AI |
+| | FastAPI | 0.115.6 | Modern async Python web framework |
+| | LiteLLM | 1.56.10 | LLM provider abstraction (OpenAI API standard) |
+| | Ollama | 0.13.5 | Local LLM runtime |
+| | llama3.2 | 2GB | Fast, capable open-source LLM |
+| | sentence-transformers | 3.3.1 | Text embeddings (384d vectors) |
 | **Database** | PostgreSQL | 16+ | Reliable, ACID-compliant |
+| | pgvector | 0.8.1 | Vector similarity search extension |
 | **Infrastructure** | Docker | latest | Containerization |
 | | Docker Compose | latest | Multi-container orchestration |
 
@@ -51,6 +81,7 @@ This project teaches:
 ### Prerequisites
 
 - **Docker** and **Docker Compose** installed
+- **Ollama** for AI features (install: `brew install ollama`)
 - **(Optional)** Google Books API key for ISBN lookup
 
 ### One-Command Startup
@@ -59,12 +90,29 @@ This project teaches:
 # Clone and navigate to project
 cd bookstore
 
-# Start all services (database, backend, frontend)
+# Start Ollama and pull LLM model (one-time setup)
+ollama serve &
+ollama pull llama3.2
+
+# Start all services (database, backend, ai-service, frontend)
 docker-compose up -d
 
-# Wait 10 seconds for services to start, then open browser
+# Wait 15 seconds for services to start, then open browser
 open http://localhost:3000
+
+# Click the chat button (💬) in bottom right to talk to AI!
 ```
+
+### Services Running
+
+| Service | Port | URL | Purpose |
+|---------|------|-----|---------|
+| **Frontend** | 3000 | http://localhost:3000 | React UI |
+| **Backend** | 8082 | http://localhost:8082 | Go API |
+| **AI Service** | 8000 | http://localhost:8000 | Python AI |
+| **AI Docs** | 8000 | http://localhost:8000/docs | Interactive API docs |
+| **Database** | 5434 | localhost:5434 | PostgreSQL |
+| **Ollama** | 11434 | http://localhost:11434 | LLM Runtime |
 
 ### Test Accounts
 
@@ -75,6 +123,58 @@ The database automatically seeds these test accounts:
 | `merchant1` | `password1` | Merchant | Add books, manage inventory |
 | `merchant2` | `password2` | Merchant | Second merchant for testing |
 | `customer` | `password` | Customer | Browse and purchase books |
+
+---
+
+## 🤖 AI Features
+
+This project includes **production-ready AI integration** to demonstrate modern LLM and vector search patterns.
+
+### What's Included
+
+| Feature | Technology | Description |
+|---------|-----------|-------------|
+| **💬 AI Chat Assistant** | LiteLLM + Ollama | Conversational AI for book recommendations |
+| **🔍 Semantic Search** | pgvector + embeddings | Find books by meaning, not just keywords |
+| **📊 Vector Embeddings** | sentence-transformers | 384-dimensional vectors for similarity |
+| **🎯 Smart Recommendations** | LLM + Vector Search | Context-aware book suggestions |
+
+### Try It
+
+1. **Login** as `customer` / `password`
+2. **Click** the chat button (💬) in the bottom right
+3. **Ask** questions like:
+   - "recommend books about entrepreneurship"
+   - "find sci-fi novels"
+   - "books for learning programming"
+4. **Get** AI-powered responses with relevant book suggestions!
+
+### Architecture Highlight
+
+```
+User Question
+    ↓
+Frontend Chat UI
+    ↓ (HTTP + Auth)
+Go Backend (/api/ai/chat)
+    ↓ (REST API)
+Python AI Service
+    ├─→ Generate embeddings → PostgreSQL pgvector
+    │                         (semantic search for relevant books)
+    ├─→ LiteLLM → Ollama → llama3.2
+    │             (generate conversational response)
+    └─→ Combine results
+         ↓
+AI Response + Book Recommendations
+```
+
+### Learning Resources
+
+- 📖 **[AI_FEATURES.md](AI_FEATURES.md)** - Complete architecture and implementation guide
+- 🚀 **[AI_SETUP_GUIDE.md](AI_SETUP_GUIDE.md)** - Step-by-step setup instructions
+- 🎯 **[AI_ARCHITECTURE_DECISION.md](AI_ARCHITECTURE_DECISION.md)** - Why we chose each technology
+
+**Key Learning**: This demonstrates REST communication between microservices, LLM integration patterns, and vector search—all using **completely free tools** (Ollama + pgvector).
 
 ---
 

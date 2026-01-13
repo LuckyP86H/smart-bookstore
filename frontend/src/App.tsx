@@ -6,6 +6,7 @@ import BookCard from './components/BookCard';
 import Cart from './components/Cart';
 import FilterPanel from './components/FilterPanel';
 import ThemeToggle from './components/ThemeToggle';
+import Chat from './components/Chat';
 import './App.css';
 
 // Helper functions for session persistence
@@ -350,6 +351,21 @@ function App() {
           />
         </div>
       </div>
+
+      {/* AI Chat Assistant - Only show when authenticated */}
+      {authenticated && (
+        <Chat
+          username={username}
+          password={password}
+          onBookClick={(bookId) => {
+            // Scroll to book when clicked from chat recommendations
+            const bookElement = document.querySelector(`[data-book-id="${bookId}"]`);
+            if (bookElement) {
+              bookElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
