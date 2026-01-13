@@ -1,0 +1,89 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Registry
+        if: github.event.inputs.environment == 'production'
+        uses: docker/login-action@v3
+        with:
+          # Configure these secrets in GitHub repository settings
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Build and push backend
+        if: github.event.inputs.environment == 'production'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-backend:${{ github.sha }}
+      
+      - name: Build and push frontend
+        if: github.event.inputs.environment == 'production'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-frontend:${{ github.sha }}
+      
+      - name: Build and push AI service
+        if: github.event.inputs.environment == 'production'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-service
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-ai:latest
+            ${{ secrets.DOCKER_USERNAME }}/bookstore-ai:${{ github.sha }}
+      
+      # Deploy to Railway (example)
+      # - name: Deploy to Railway
+      #   env:
+      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      #   run: |
+      #     npm i -g @railway/cli
+      #     railway up --service backend
+      #     railway up --service frontend
+      #     railway up --service ai-service
+      
+      # Deploy to Render (example)
+      # - name: Deploy to Render
+      #   uses: johnbeynon/render-deploy-action@v0.0.8
+      #   with:
+      #     service-id: ${{ secrets.RENDER_SERVICE_ID }}
+      #     api-key: ${{ secrets.RENDER_API_KEY }}
+      
+      - name: Deployment summary
+        run: |
+          echo "🚀 Deployment to ${{ github.event.inputs.environment }} initiated"
+          echo "📦 Backend: Built and tagged with SHA ${{ github.sha }}"
+          echo "📦 Frontend: Built and tagged with SHA ${{ github.sha }}"
+          echo "📦 AI Service: Built and tagged with SHA ${{ github.sha }}"
+          echo "✅ Ready for production use!"

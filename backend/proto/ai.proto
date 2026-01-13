@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package bookstore.v1;
+
+option go_package = "github.com/LuckyP86H/smart-bookstore/gen;bookstorev1";
+
+// AI-powered features service
+// This service integrates with the Python AI microservice
+service AIService {
+  // Chat with AI assistant about books
+  rpc Chat(ChatRequest) returns (ChatResponse);
+  
+  // Semantic search for books
+  rpc SemanticSearch(SemanticSearchRequest) returns (SemanticSearchResponse);
+}
+
+// ============================================================================
+// Chat Messages
+// ============================================================================
+
+message ChatRequest {
+  string message = 1;  // User's message
+  repeated string context = 2;  // Previous conversation messages
+}
+
+message BookRecommendation {
+  int64 book_id = 1;
+  string title = 2;
+  string author = 3;
+  double relevance_score = 4;
+  string reason = 5;
+}
+
+message ChatResponse {
+  string reply = 1;  // AI's text response
+  repeated BookRecommendation books = 2;  // Recommended books
+  double confidence = 3;  // Confidence score (0-1)
+}
+
+// ============================================================================
+// Semantic Search Messages
+// ============================================================================
+
+message SemanticSearchRequest {
+  string query = 1;
+  int32 limit = 2;  // Maximum number of results
+  double min_score = 3;  // Minimum similarity score (0-1)
+}
+
+message SearchResult {
+  int64 book_id = 1;
+  string title = 2;
+  string author = 3;
+  string description = 4;
+  double score = 5;  // Similarity score
+}
+
+message SemanticSearchResponse {
+  repeated SearchResult results = 1;
+  string query = 2;
+  int32 total_found = 3;
+}

@@ -1,4 +1,4 @@
-module github.com/pxu/bookstore
+module github.com/LuckyP86H/smart-bookstore
 
 go 1.25.3
 

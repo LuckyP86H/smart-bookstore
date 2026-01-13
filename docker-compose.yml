@@ -8,9 +8,9 @@
 #   docker-compose down -v      # Stop and remove volumes (fresh start)
 
 services:
-  # PostgreSQL database service
+  # PostgreSQL database service with pgvector extension
   database:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: bookstore-db
     restart: unless-stopped
     
@@ -57,6 +57,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: bookstore
       PORT: 8082
+      AI_SERVICE_URL: http://ai-service:8000  # Internal service URL
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}  # Optional API key
     
     # Port mapping: expose backend on host port 8082
@@ -81,11 +82,55 @@ services:
     networks:
       - bookstore-network
 
+  # Python AI service
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: bookstore-ai
+    restart: unless-stopped
+    
+    # Environment variables for AI service
+    environment:
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: bookstore
+      # Ollama runs on host machine, accessible via host.docker.internal
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.2
+      PORT: 8000
+    
+    # Port mapping: expose AI service on host port 8000
+    ports:
+      - "8000:8000"
+    
+    # Wait for database to be healthy
+    depends_on:
+      database:
+        condition: service_healthy
+    
+    # Health check for AI service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s  # AI service takes longer to start (loads ML models)
+    
+    # Special config to allow accessing host machine (for Ollama)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
+    networks:
+      - bookstore-network
+
   # React frontend service
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: bookstore-frontend
     restart: unless-stopped
     

@@ -6,15 +6,15 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/pxu/bookstore/db"
+	"github.com/LuckyP86H/smart-bookstore/db"
 )
 
 type contextKey string
 
 const (
-	StoreIDKey     = contextKey("store_id")
-	IsCustomerKey  = contextKey("is_customer")
-	UsernameKey    = contextKey("username")
+	StoreIDKey    = contextKey("store_id")
+	IsCustomerKey = contextKey("is_customer")
+	UsernameKey   = contextKey("username")
 )
 
 type AuthInterceptor struct {
