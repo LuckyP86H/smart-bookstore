@@ -16,21 +16,43 @@ jobs:
   backend-test:
     name: Backend Tests (Go)
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.25.0'
           cache-dependency-path: backend/go.sum
-      
+
+      - name: Install protoc
+        run: |
+          PROTOC_VERSION=33.4
+          curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip
+          sudo unzip -o protoc-${PROTOC_VERSION}-linux-x86_64.zip -d /usr/local bin/protoc
+          sudo unzip -o protoc-${PROTOC_VERSION}-linux-x86_64.zip -d /usr/local 'include/*'
+          rm protoc-${PROTOC_VERSION}-linux-x86_64.zip
+          protoc --version
+
       - name: Install dependencies
         working-directory: ./backend
         run: go mod download
-      
+
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
+
+      - name: Generate protobuf code
+        working-directory: ./backend
+        run: |
+          protoc --proto_path=proto \
+            --go_out=gen --go_opt=paths=source_relative \
+            --connect-go_out=gen --connect-go_opt=paths=source_relative \
+            proto/bookstore.proto proto/ai.proto
+
       - name: Run go vet
         working-directory: ./backend
         run: go vet ./...
@@ -63,22 +85,41 @@ jobs:
   frontend-test:
     name: Frontend Tests (React)
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
-      
+
+      - name: Install protoc
+        run: |
+          PROTOC_VERSION=33.4
+          curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip
+          sudo unzip -o protoc-${PROTOC_VERSION}-linux-x86_64.zip -d /usr/local bin/protoc
+          sudo unzip -o protoc-${PROTOC_VERSION}-linux-x86_64.zip -d /usr/local 'include/*'
+          rm protoc-${PROTOC_VERSION}-linux-x86_64.zip
+          protoc --version
+
       - name: Install dependencies
         working-directory: ./frontend
         run: npm ci
-      
+
+      - name: Generate protobuf code
+        working-directory: ./frontend
+        run: |
+          protoc --proto_path=../backend/proto \
+            --plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
+            --plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
+            --es_out=src/gen --es_opt=target=ts \
+            --connect-es_out=src/gen --connect-es_opt=target=ts \
+            ../backend/proto/bookstore.proto ../backend/proto/ai.proto
+
       - name: TypeScript type check
         working-directory: ./frontend
         run: npm run type-check || npx tsc --noEmit
