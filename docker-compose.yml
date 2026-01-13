@@ -129,8 +129,8 @@ services:
   # React frontend service
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: bookstore-frontend
     restart: unless-stopped
     

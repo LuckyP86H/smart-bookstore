@@ -3,7 +3,7 @@ Chat service using LiteLLM for LLM interactions.
 LiteLLM provides a unified interface to multiple LLM providers.
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import litellm
 from app.config.settings import settings
 from app.services.embeddings import get_embedding_service
@@ -30,7 +30,7 @@ class ChatService:
         self, 
         user_id: str, 
         message: str, 
-        context: List[str] = None
+        context: Optional[List[str]] = None
     ) -> Tuple[str, List[Dict], float]:
         """
         Process a chat message and optionally recommend books.
