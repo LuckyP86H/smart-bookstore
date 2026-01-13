@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package bookstore.v1;
 
-option go_package = "github.com/bookstore/gen/bookstore/v1;bookstorev1";
+option go_package = "github.com/LuckyP86H/smart-bookstore/gen;bookstorev1";
 
 // AI-powered features service
 // This service integrates with the Python AI microservice
