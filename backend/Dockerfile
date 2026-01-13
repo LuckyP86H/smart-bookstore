@@ -8,16 +8,29 @@ RUN apk add --no-cache git protobuf
 # Set working directory
 WORKDIR /app
 
+# Ensure Go binaries installed by `go install` are on PATH
+ENV PATH="/go/bin:${PATH}"
+
 # Copy go.mod and go.sum first for better layer caching
 # Docker caches layers, so if dependencies don't change, this layer is reused
 COPY go.mod go.sum ./
 RUN go mod download
 
+
 # Copy the entire source code
 COPY . .
 
-# Ensure module graph is complete (helps when generated code lives in the repo)
-RUN go mod tidy
+# Install protoc-gen plugins and generate protobuf code inside the builder
+# This ensures generated code is available during `go build` without relying on
+# CI job artifacts or fetching modules from the proxy.
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11 \
+	&& go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.19.1
+
+RUN mkdir -p gen \
+	&& protoc --proto_path=proto \
+		--go_out=gen --go_opt=paths=source_relative \
+		--connect-go_out=gen --connect-go_opt=paths=source_relative \
+		proto/bookstore.proto proto/ai.proto
 
 # Build the binary
 # CGO_ENABLED=0 creates a static binary that doesn't depend on C libraries
