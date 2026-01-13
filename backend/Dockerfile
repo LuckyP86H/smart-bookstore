@@ -16,6 +16,9 @@ RUN go mod download
 # Copy the entire source code
 COPY . .
 
+# Ensure module graph is complete (helps when generated code lives in the repo)
+RUN go mod tidy
+
 # Build the binary
 # CGO_ENABLED=0 creates a static binary that doesn't depend on C libraries
 # This makes it portable across different Linux distributions
