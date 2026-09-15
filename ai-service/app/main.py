@@ -8,7 +8,10 @@ This service communicates with the Go backend via REST API.
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
 import sys
+
+logger = logging.getLogger("uvicorn.error")
 
 # Import configuration and models
 from app.config.settings import settings
@@ -36,8 +39,9 @@ async def lifespan(app: FastAPI):
     Initializes services on startup.
     """
     print("🚀 Starting Bookstore AI Service...")
-    print(f"📦 Model: {settings.ollama_model}")
-    print(f"🔌 Ollama: {settings.ollama_base_url}")
+    print(f"📦 Model: {settings.llm_model}")
+    if settings.resolved_llm_api_base:
+        print(f"🔌 LLM endpoint: {settings.resolved_llm_api_base}")
     print(f"💾 Database: {settings.db_host}:{settings.db_port}/{settings.db_name}")
     
     # Initialize services (loads models)
@@ -63,11 +67,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware to allow requests from frontend/backend
+# CORS for local dev tools; no cookies/credentials are used by this service,
+# so credentialed cross-origin requests stay disabled.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -87,30 +92,32 @@ async def root():
 async def health_check():
     """
     Health check endpoint.
-    Verifies that Ollama and database connections are working.
+    Verifies that the LLM endpoint and database connections are working.
     """
-    # Check Ollama connection
-    ollama_connected = True
-    try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{settings.ollama_base_url}/api/tags")
-            ollama_connected = response.status_code == 200
-    except:
-        ollama_connected = False
-    
+    # For a local Ollama endpoint we can actively probe it; cloud providers
+    # (OpenAI, Anthropic, DeepSeek, Gemini, ...) are assumed reachable.
+    llm_connected = True
+    if settings.llm_model.startswith("ollama/"):
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{settings.resolved_llm_api_base}/api/tags")
+                llm_connected = response.status_code == 200
+        except Exception:
+            llm_connected = False
+
     # Check database connection
     db_connected = True
     try:
         from app.services.search import get_db_connection
         conn = get_db_connection()
         conn.close()
-    except:
+    except Exception:
         db_connected = False
-    
+
     return HealthResponse(
-        status="healthy" if (ollama_connected and db_connected) else "degraded",
-        ollama_connected=ollama_connected,
+        status="healthy" if (llm_connected and db_connected) else "degraded",
+        llm_connected=llm_connected,
         database_connected=db_connected,
         version=settings.app_version
     )
@@ -155,11 +162,12 @@ async def chat(request: ChatRequest):
             confidence=confidence
         )
         
-    except Exception as e:
-        print(f"Error in chat endpoint: {e}")
+    except Exception:
+        # Log the full error server-side; return a generic message to clients
+        logger.exception("Error in chat endpoint")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Chat service error: {str(e)}"
+            detail="Chat service error"
         )
 
 
@@ -211,11 +219,11 @@ async def semantic_search(request: SemanticSearchRequest):
             total_found=len(search_results)
         )
         
-    except Exception as e:
-        print(f"Error in semantic search: {e}")
+    except Exception:
+        logger.exception("Error in semantic search")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search error: {str(e)}"
+            detail="Search error"
         )
 
 
@@ -228,10 +236,11 @@ async def text_search(query: str, limit: int = 10):
     try:
         results = await search_books_by_text(query=query, limit=limit)
         return {"results": results, "query": query, "total_found": len(results)}
-    except Exception as e:
+    except Exception:
+        logger.exception("Error in text search")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Text search error: {str(e)}"
+            detail="Text search error"
         )
 
 
@@ -253,10 +262,11 @@ async def generate_embedding(request: GenerateEmbeddingRequest):
             embedding=embedding,
             dimension=len(embedding)
         )
-    except Exception as e:
+    except Exception:
+        logger.exception("Error generating embedding")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Embedding generation error: {str(e)}"
+            detail="Embedding generation error"
         )
 
 
@@ -275,10 +285,11 @@ async def generate_all_embeddings():
             "books_updated": count,
             "message": f"Generated embeddings for {count} books"
         }
-    except Exception as e:
+    except Exception:
+        logger.exception("Error in batch embedding generation")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch embedding error: {str(e)}"
+            detail="Batch embedding error"
         )
 
 

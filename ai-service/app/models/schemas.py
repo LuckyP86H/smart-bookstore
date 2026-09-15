@@ -15,7 +15,8 @@ class ChatRequest(BaseModel):
     """Request for chat endpoint"""
     user_id: str = Field(..., description="User identifier")
     message: str = Field(..., description="User's message")
-    context: List[str] = Field(default=[], description="Previous conversation messages")
+    # Optional so clients may send null, omit it, or send a list
+    context: Optional[List[str]] = Field(default=None, description="Previous conversation messages")
 
     model_config = {
         "json_schema_extra": {
@@ -42,7 +43,7 @@ class BookRecommendation(BaseModel):
 class ChatResponse(BaseModel):
     """Response from chat endpoint"""
     reply: str = Field(..., description="AI's text response")
-    books: List[BookRecommendation] = Field(default=[], description="Recommended books")
+    books: List[BookRecommendation] = Field(default_factory=list, description="Recommended books")
     confidence: float = Field(..., description="Confidence score (0-1)")
 
 
@@ -117,6 +118,6 @@ class GenerateEmbeddingResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str = Field(..., description="Service status (healthy/degraded)")
-    ollama_connected: bool = Field(..., description="Ollama connection status")
+    llm_connected: bool = Field(..., description="LLM provider connection status")
     database_connected: bool = Field(..., description="Database connection status")
     version: str = Field(..., description="Service version")

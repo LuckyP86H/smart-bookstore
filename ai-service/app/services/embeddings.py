@@ -5,7 +5,6 @@ Converts text to vector embeddings for semantic search.
 
 from sentence_transformers import SentenceTransformer
 from typing import List
-import numpy as np
 from app.config.settings import settings
 
 
@@ -52,34 +51,6 @@ class EmbeddingService:
         
         # Convert to list of lists
         return embeddings.tolist()
-    
-    def compute_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
-        """
-        Compute cosine similarity between two embeddings.
-        
-        Args:
-            embedding1: First embedding vector
-            embedding2: Second embedding vector
-            
-        Returns:
-            Similarity score between 0 and 1
-        """
-        # Convert to numpy arrays
-        vec1 = np.array(embedding1)
-        vec2 = np.array(embedding2)
-        
-        # Compute cosine similarity
-        # Formula: (A · B) / (||A|| * ||B||)
-        dot_product = np.dot(vec1, vec2)
-        norm_product = np.linalg.norm(vec1) * np.linalg.norm(vec2)
-        
-        if norm_product == 0:
-            return 0.0
-        
-        similarity = dot_product / norm_product
-        
-        # Normalize to [0, 1] range (cosine similarity is [-1, 1])
-        return float((similarity + 1) / 2)
 
 
 # Global embedding service instance (singleton pattern)

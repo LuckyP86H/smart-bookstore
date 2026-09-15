@@ -1,0 +1,14 @@
+# Test dependencies. The unit tests stub the heavy ML/LLM/DB packages
+# (sentence-transformers/torch, litellm, psycopg2), so CI only needs the web
+# framework plus the test runner. Versions of shared packages are constrained
+# to the pins in requirements.txt to avoid drift.
+-c requirements.txt
+
+fastapi
+pydantic
+pydantic-settings
+python-dotenv
+httpx
+
+pytest==8.3.4
+pytest-asyncio==0.25.2
