@@ -11,9 +11,9 @@ sentence-transformers==3.3.1
 # PostgreSQL adapter with pgvector support
 psycopg2-binary==2.9.10
 
-# Pydantic for data validation
-pydantic==2.10.5
-pydantic-settings==2.7.1
+# Pydantic for data validation (litellm >=1.101 needs newer pydantic-settings)
+pydantic==2.13.5
+pydantic-settings==2.15.0
 
 # HTTP client for health checks (litellm also depends on it)
 httpx>=0.27.0,<1.0
