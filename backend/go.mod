@@ -1,12 +1,12 @@
 module github.com/LuckyP86H/smart-bookstore
 
-go 1.25.3
+go 1.26.0
 
 require (
 	connectrpc.com/connect v1.19.1
 	github.com/lib/pq v1.10.9
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.59.0
 	google.golang.org/protobuf v1.36.11
 )
 
-require golang.org/x/text v0.32.0 // indirect
+require golang.org/x/text v0.42.0 // indirect

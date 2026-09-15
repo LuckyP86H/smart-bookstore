@@ -7,14 +7,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/app/.cache/huggingface
 
+# Install CPU-only torch in its own layer (cached across requirements bumps):
+# the default PyPI wheels pull multi-GB NVIDIA CUDA dependencies that are
+# useless in this CPU container.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+
 # Copy requirements first for better layer caching
 COPY requirements.txt .
 
-# Install CPU-only torch first: the default PyPI wheels pull multi-GB NVIDIA
-# CUDA dependencies that are useless in this CPU container. Everything ships
-# prebuilt wheels, so no compilers or system packages are needed.
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install --no-cache-dir -r requirements.txt
+# Everything ships prebuilt wheels, so no compilers or system packages needed
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download the embedding model so containers start fast and work offline
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
