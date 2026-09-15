@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	bookstorev1 "github.com/pxu/bookstore/gen"
-	"github.com/pxu/bookstore/db"
-	"github.com/pxu/bookstore/external"
-	"github.com/pxu/bookstore/interceptors"
+	"github.com/LuckyP86H/smart-bookstore/db"
+	"github.com/LuckyP86H/smart-bookstore/external"
+	bookstorev1 "github.com/LuckyP86H/smart-bookstore/gen"
+	"github.com/LuckyP86H/smart-bookstore/interceptors"
 )
 
 type MerchantServiceServer struct {
@@ -239,13 +239,13 @@ func dbBookToProto(book *db.Book) *bookstorev1.Book {
 
 func dbSaleToProto(sale *db.Sale) *bookstorev1.Sale {
 	return &bookstorev1.Sale{
-		Id:                sale.ID,
-		BookId:            sale.BookID,
-		BookTitle:         sale.BookTitle,
-		CustomerId:        sale.CustomerID,
-		CustomerName:      sale.CustomerName,
-		Quantity:          sale.Quantity,
-		PriceAtPurchase:   sale.PriceAtPurchase,
-		PurchasedAt:       sale.PurchasedAt.Format(time.RFC3339),
+		Id:              sale.ID,
+		BookId:          sale.BookID,
+		BookTitle:       sale.BookTitle,
+		CustomerId:      sale.CustomerID,
+		CustomerName:    sale.CustomerName,
+		Quantity:        sale.Quantity,
+		PriceAtPurchase: sale.PriceAtPurchase,
+		PurchasedAt:     sale.PurchasedAt.Format(time.RFC3339),
 	}
 }

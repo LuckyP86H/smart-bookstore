@@ -1,8 +1,9 @@
 // ConnectRPC client setup for communicating with the backend
 // ConnectRPC is a modern, type-safe alternative to gRPC-Web that works natively in browsers
 
-import { createPromiseClient } from "@connectrpc/connect";
+import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import type { Interceptor, Transport } from "@connectrpc/connect";
 import { MerchantService } from "../gen/bookstore_connect";
 import { CustomerService } from "../gen/bookstore_connect";
 
@@ -17,14 +18,16 @@ const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8082";
  * @param password - Optional password for HTTP Basic Auth
  * @returns ConnectTransport configured for our backend
  */
-function createTransport(username?: string, password?: string) {
+function createTransport(username?: string, password?: string): Transport {
   // Interceptor adds authentication headers to every request
   // Similar to middleware in Express - runs before each RPC call
-  const interceptor = username && password ? (next: any) => async (req: any) => {
-    // Add HTTP Basic Auth header: "Authorization: Basic base64(username:password)"
-    req.header.set("Authorization", `Basic ${btoa(`${username}:${password}`)}`);
-    return next(req);
-  } : undefined;
+  const interceptor: Interceptor | undefined = username && password 
+    ? (next) => async (req) => {
+        // Add HTTP Basic Auth header: "Authorization: Basic base64(username:password)"
+        req.header.set("Authorization", `Basic ${btoa(`${username}:${password}`)}`);
+        return next(req);
+      }
+    : undefined;
   
   return createConnectTransport({
     baseUrl,
@@ -42,9 +45,9 @@ function createTransport(username?: string, password?: string) {
  */
 export function createMerchantClient(username: string, password: string) {
   const transport = createTransport(username, password);
-  // createPromiseClient generates a client with methods matching our .proto service definition
+  // createClient generates a client with methods matching our .proto service definition
   // All methods return Promises and have TypeScript types auto-generated
-  return createPromiseClient(MerchantService, transport);
+  return createClient(MerchantService, transport);
 }
 
 /**
@@ -57,7 +60,7 @@ export function createMerchantClient(username: string, password: string) {
  */
 export function createCustomerClient(username: string, password: string) {
   const transport = createTransport(username, password);
-  return createPromiseClient(CustomerService, transport);
+  return createClient(CustomerService, transport);
 }
 
 /**
@@ -68,7 +71,7 @@ export function createCustomerClient(username: string, password: string) {
  */
 export function createPublicMerchantClient() {
   const transport = createTransport();
-  return createPromiseClient(MerchantService, transport);
+  return createClient(MerchantService, transport);
 }
 
 /**

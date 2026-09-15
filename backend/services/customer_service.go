@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	bookstorev1 "github.com/pxu/bookstore/gen"
-	"github.com/pxu/bookstore/db"
-	"github.com/pxu/bookstore/interceptors"
+	"github.com/LuckyP86H/smart-bookstore/db"
+	bookstorev1 "github.com/LuckyP86H/smart-bookstore/gen"
+	"github.com/LuckyP86H/smart-bookstore/interceptors"
 )
 
 type CustomerServiceServer struct {

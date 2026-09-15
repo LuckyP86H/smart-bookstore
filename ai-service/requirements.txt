@@ -1,0 +1,22 @@
+# FastAPI web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# LiteLLM for LLM provider abstraction
+litellm==1.101.0
+
+# Sentence transformers for embeddings
+sentence-transformers==3.3.1
+
+# PostgreSQL adapter with pgvector support
+psycopg2-binary==2.9.10
+
+# Pydantic for data validation (litellm >=1.101 needs newer pydantic-settings)
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# HTTP client for health checks (litellm also depends on it)
+httpx>=0.27.0,<1.0
+
+# Python dotenv for environment variables
+python-dotenv==1.2.3

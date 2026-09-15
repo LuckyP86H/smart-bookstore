@@ -4,19 +4,24 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"connectrpc.com/connect"
-	"golang.org/x/net/http2"      // HTTP/2 support for better performance
-	"golang.org/x/net/http2/h2c"  // h2c = HTTP/2 Cleartext (without TLS)
+	"golang.org/x/net/http2"     // HTTP/2 support for better performance
+	"golang.org/x/net/http2/h2c" // h2c = HTTP/2 Cleartext (without TLS)
 
-	"github.com/pxu/bookstore/db"
-	"github.com/pxu/bookstore/external"
-	"github.com/pxu/bookstore/gen/bookstorev1connect"  // Auto-generated ConnectRPC service handlers
-	"github.com/pxu/bookstore/interceptors"
-	"github.com/pxu/bookstore/services"
+	"github.com/LuckyP86H/smart-bookstore/db"
+	"github.com/LuckyP86H/smart-bookstore/external"
+	"github.com/LuckyP86H/smart-bookstore/gen/bookstorev1connect" // Auto-generated ConnectRPC service handlers
+	"github.com/LuckyP86H/smart-bookstore/handlers"
+	"github.com/LuckyP86H/smart-bookstore/interceptors"
+	"github.com/LuckyP86H/smart-bookstore/services"
 )
 
 func main() {
@@ -28,6 +33,7 @@ func main() {
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "bookstore")
 	googleBooksAPIKey := getEnv("GOOGLE_BOOKS_API_KEY", "")
+	aiServiceURL := getEnv("AI_SERVICE_URL", "http://localhost:8000")
 	port := getEnv("PORT", "8082")
 
 	// Initialize database connection
@@ -65,7 +71,7 @@ func main() {
 	// It creates HTTP handlers for all RPC methods defined in MerchantService
 	merchantPath, merchantHandler := bookstorev1connect.NewMerchantServiceHandler(
 		merchantService,
-		connect.WithInterceptors(authInterceptor),  // Apply authentication to all merchant RPCs
+		connect.WithInterceptors(authInterceptor), // Apply authentication to all merchant RPCs
 	)
 	mux.Handle(merchantPath, merchantHandler)
 
@@ -73,9 +79,16 @@ func main() {
 	// Similarly handles all customer-facing RPC methods
 	customerPath, customerHandler := bookstorev1connect.NewCustomerServiceHandler(
 		customerService,
-		connect.WithInterceptors(authInterceptor),  // Apply authentication to all customer RPCs
+		connect.WithInterceptors(authInterceptor), // Apply authentication to all customer RPCs
 	)
 	mux.Handle(customerPath, customerHandler)
+
+	// Register AI Service HTTP endpoints
+	// These are REST endpoints that communicate with the Python AI microservice
+	aiHandler := handlers.NewAIHandler(aiServiceURL)
+	mux.HandleFunc("/api/ai/chat", basicAuthMiddleware(database, aiHandler.HandleChat))
+	mux.HandleFunc("/api/ai/search/semantic", aiHandler.HandleSemanticSearch) // No auth required for search
+	mux.HandleFunc("/api/ai/health", aiHandler.HandleHealth)
 
 	// Wrap with CORS middleware for browser access
 	// Allows frontend running on different origin (port 3000) to make requests
@@ -96,8 +109,47 @@ func main() {
 	log.Println("   Merchants: merchant1:password1, merchant2:password2")
 	log.Println("   Customer: customer:password")
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Serve in a goroutine so we can shut down gracefully on SIGINT/SIGTERM.
+	// Graceful shutdown lets in-flight requests finish during rolling deploys.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.ListenAndServe()
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		log.Fatalf("Server error: %v", err)
+	case sig := <-stop:
+		log.Printf("Received %s, shutting down gracefully...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Graceful shutdown failed: %v", err)
+		}
+	}
+}
+
+// basicAuthMiddleware wraps HTTP handlers with HTTP Basic Auth validation
+func basicAuthMiddleware(database *db.Database, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Bookstore"`)
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate credentials
+		if !database.ValidateCredentials(username, password) {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
+
+		// Continue to handler
+		next(w, r)
 	}
 }
 
@@ -108,13 +160,13 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Allow any origin - in production, you'd specify your frontend domain
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		
+
 		// Allow standard HTTP methods
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		
+
 		// Allow headers needed by ConnectRPC and authentication
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Connect-Protocol-Version, Connect-Timeout-Ms")
-		
+
 		// Expose ConnectRPC-specific headers to the browser
 		w.Header().Set("Access-Control-Expose-Headers", "Connect-Protocol-Version, Connect-Timeout-Ms")
 

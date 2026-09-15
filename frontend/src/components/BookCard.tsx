@@ -53,7 +53,7 @@ function BookCard({ book, onBuyNow, onAddToCart, cartQuantity = 0 }: BookCardPro
   };
 
   return (
-    <div className="book-card">
+    <div className="book-card" data-book-id={book.id.toString()}>
       {book.coverImageUrl && (
         <img
           src={book.coverImageUrl}

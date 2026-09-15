@@ -84,7 +84,7 @@ func (c *GoogleBooksClient) LookupByISBN(isbn string) (*BookInfo, error) {
 
 	// Extract book info
 	volumeInfo := result.Items[0].VolumeInfo
-	
+
 	author := ""
 	if len(volumeInfo.Authors) > 0 {
 		author = volumeInfo.Authors[0]
