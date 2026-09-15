@@ -13,7 +13,7 @@
     "@bufbuild/protobuf": "^1.10.0",
     "@connectrpc/connect": "1.7.0",
     "@connectrpc/connect-web": "1.7.0",
-    "react": "19.1.4",
+    "react": "19.3.0",
     "react-dom": "19.1.4"
   },
   "devDependencies": {
@@ -22,7 +22,7 @@
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
