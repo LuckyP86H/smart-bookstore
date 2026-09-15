@@ -65,7 +65,7 @@ This project teaches:
 | | PostgreSQL Driver | latest | Database connectivity |
 | **AI Service** | Python | 3.11 | Best ecosystem for ML/AI |
 | | FastAPI | 0.115.6 | Modern async Python web framework |
-| | LiteLLM | 1.56.10 | LLM provider abstraction (OpenAI API standard) |
+| | LiteLLM | 1.80.16 | LLM provider abstraction (OpenAI API standard) |
 | | Ollama | 0.13.5 | Local LLM runtime |
 | | llama3.2 | 2GB | Fast, capable open-source LLM |
 | | sentence-transformers | 3.3.1 | Text embeddings (384d vectors) |
