@@ -81,7 +81,7 @@ type SemanticSearchResponse struct {
 // HealthResponse represents AI service health status
 type HealthResponse struct {
 	Status            string `json:"status"`
-	OllamaConnected   bool   `json:"ollama_connected"`
+	LLMConnected      bool   `json:"llm_connected"`
 	DatabaseConnected bool   `json:"database_connected"`
 	Version           string `json:"version"`
 }
@@ -92,6 +92,11 @@ type HealthResponse struct {
 
 // Chat sends a message to the AI and gets recommendations
 func (c *AIClient) Chat(ctx context.Context, userID, message string, context []string) (*ChatResponse, error) {
+	// Marshal nil context as [] rather than null for the Python service
+	if context == nil {
+		context = []string{}
+	}
+
 	// Prepare request
 	reqBody := ChatRequest{
 		UserID:  userID,
@@ -197,36 +202,4 @@ func (c *AIClient) Health(ctx context.Context) (*HealthResponse, error) {
 	}
 
 	return &healthResp, nil
-}
-
-// GenerateEmbeddingsForAllBooks triggers batch embedding generation
-// This is typically called once during setup/migration
-func (c *AIClient) GenerateEmbeddingsForAllBooks(ctx context.Context) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/embeddings/generate-all", nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("failed to call AI service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("AI service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Status       string `json:"status"`
-		BooksUpdated int    `json:"books_updated"`
-		Message      string `json:"message"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return result.BooksUpdated, nil
 }

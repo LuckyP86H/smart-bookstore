@@ -21,6 +21,12 @@ func NewDatabase(host, port, user, password, dbname string) (*Database, error) {
 		return nil, err
 	}
 
+	// Bound the connection pool so load spikes queue instead of exhausting
+	// Postgres connections; recycle connections to play well with poolers/LBs.
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
@@ -196,11 +202,12 @@ func (d *Database) AuthenticateStore(username, password string) (int64, bool, er
 	return storeID, isCustomer, nil
 }
 
-// ValidateCredentials checks if username and password are valid
-// Returns true if credentials are valid, false otherwise
+// ValidateCredentials checks if username and password are valid.
+// AuthenticateStore reports "no such user" and "wrong password" as a zero
+// store ID with a nil error, so both must be checked.
 func (d *Database) ValidateCredentials(username, password string) bool {
-	_, _, err := d.AuthenticateStore(username, password)
-	return err == nil
+	storeID, _, err := d.AuthenticateStore(username, password)
+	return err == nil && storeID != 0
 }
 
 // ============================================================================

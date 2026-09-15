@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -61,7 +62,9 @@ func (h *AIHandler) HandleChat(w http.ResponseWriter, r *http.Request) {
 
 	aiResp, err := h.aiClient.Chat(ctx, username, req.Message, req.Context)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Log details server-side; never leak internal errors to clients
+		log.Printf("AI chat error: %v", err)
+		http.Error(w, "AI service unavailable", http.StatusInternalServerError)
 		return
 	}
 
@@ -102,12 +105,13 @@ func (h *AIHandler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Set defaults
+	// Set defaults. The similarity floor matches the AI service's default:
+	// with all-MiniLM-L6-v2, strong topical matches score ~0.4-0.6.
 	if req.Limit == 0 {
 		req.Limit = 10
 	}
 	if req.MinScore == 0 {
-		req.MinScore = 0.5
+		req.MinScore = 0.35
 	}
 
 	// Call AI service
@@ -116,7 +120,8 @@ func (h *AIHandler) HandleSemanticSearch(w http.ResponseWriter, r *http.Request)
 
 	aiResp, err := h.aiClient.SemanticSearch(ctx, req.Query, req.Limit, req.MinScore)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("AI semantic search error: %v", err)
+		http.Error(w, "Search unavailable", http.StatusInternalServerError)
 		return
 	}
 
@@ -141,7 +146,8 @@ func (h *AIHandler) HandleHealth(w http.ResponseWriter, r *http.Request) {
 
 	health, err := h.aiClient.Health(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("AI health check error: %v", err)
+		http.Error(w, "AI service unavailable", http.StatusInternalServerError)
 		return
 	}
 

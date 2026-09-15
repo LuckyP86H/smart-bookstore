@@ -4,9 +4,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"connectrpc.com/connect"
 	"golang.org/x/net/http2"     // HTTP/2 support for better performance
@@ -105,8 +109,26 @@ func main() {
 	log.Println("   Merchants: merchant1:password1, merchant2:password2")
 	log.Println("   Customer: customer:password")
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Serve in a goroutine so we can shut down gracefully on SIGINT/SIGTERM.
+	// Graceful shutdown lets in-flight requests finish during rolling deploys.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.ListenAndServe()
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		log.Fatalf("Server error: %v", err)
+	case sig := <-stop:
+		log.Printf("Received %s, shutting down gracefully...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Graceful shutdown failed: %v", err)
+		}
 	}
 }
 

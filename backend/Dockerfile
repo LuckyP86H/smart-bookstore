@@ -30,7 +30,7 @@ RUN mkdir -p gen \
 	&& protoc --proto_path=proto \
 		--go_out=gen --go_opt=paths=source_relative \
 		--connect-go_out=gen --connect-go_opt=paths=source_relative \
-		proto/bookstore.proto proto/ai.proto
+		proto/bookstore.proto
 
 # Build the binary
 # CGO_ENABLED=0 creates a static binary that doesn't depend on C libraries
