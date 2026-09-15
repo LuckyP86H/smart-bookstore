@@ -16,6 +16,12 @@ build/
 # Vite / dev server cache
 /.vite/
 
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
 # Env files
 .env
 .env.local

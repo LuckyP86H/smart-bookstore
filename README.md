@@ -134,7 +134,7 @@ This project includes **production-ready AI integration** to demonstrate modern 
 
 | Feature | Technology | Description |
 |---------|-----------|-------------|
-| **💬 AI Chat Assistant** | LiteLLM + Ollama | Conversational AI for book recommendations |
+| **💬 AI Chat Assistant** | LiteLLM (Ollama, OpenAI, Anthropic, DeepSeek, Gemini, ...) | Conversational AI for book recommendations |
 | **🔍 Semantic Search** | pgvector + embeddings | Find books by meaning, not just keywords |
 | **📊 Vector Embeddings** | sentence-transformers | 384-dimensional vectors for similarity |
 | **🎯 Smart Recommendations** | LLM + Vector Search | Context-aware book suggestions |
@@ -161,20 +161,28 @@ Go Backend (/api/ai/chat)
 Python AI Service
     ├─→ Generate embeddings → PostgreSQL pgvector
     │                         (semantic search for relevant books)
-    ├─→ LiteLLM → Ollama → llama3.2
-    │             (generate conversational response)
+    ├─→ LiteLLM → configured LLM provider
+    │             (Ollama / OpenAI / Anthropic / DeepSeek / Gemini / ...)
     └─→ Combine results
          ↓
 AI Response + Book Recommendations
 ```
 
-### Learning Resources
+### Switching LLM Providers
 
-- 📖 **[AI_FEATURES.md](AI_FEATURES.md)** - Complete architecture and implementation guide
-- 🚀 **[AI_SETUP_GUIDE.md](AI_SETUP_GUIDE.md)** - Step-by-step setup instructions
-- 🎯 **[AI_ARCHITECTURE_DECISION.md](AI_ARCHITECTURE_DECISION.md)** - Why we chose each technology
+The AI service uses [LiteLLM](https://docs.litellm.ai/), so the LLM backend is selected purely by configuration — no code changes. Set `LLM_MODEL` (and the matching API key) in `ai-service/.env` (gitignored):
 
-**Key Learning**: This demonstrates REST communication between microservices, LLM integration patterns, and vector search—all using **completely free tools** (Ollama + pgvector).
+| Provider | `LLM_MODEL` example | Required env var |
+|----------|--------------------|------------------|
+| Ollama (local, default) | `ollama/llama3.2` | `LLM_API_BASE` (optional) |
+| OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| Anthropic | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
+| DeepSeek | `deepseek/deepseek-chat` | `DEEPSEEK_API_KEY` |
+| Gemini | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
+
+See `ai-service/.env.example` for the full template.
+
+**Key Learning**: This demonstrates REST communication between microservices, provider-agnostic LLM integration, and vector search — runnable end-to-end with **completely free tools** (Ollama + pgvector).
 
 ---
 

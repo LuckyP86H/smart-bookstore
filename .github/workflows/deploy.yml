@@ -1,5 +1,8 @@
 name: Deploy to Production
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:  # Manual trigger only
     inputs:
@@ -47,7 +50,10 @@ jobs:
         if: github.event.inputs.environment == 'production'
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          # The frontend Dockerfile needs the repo root as context (it copies
+          # backend/proto to generate the TypeScript client)
+          context: .
+          file: frontend/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/bookstore-frontend:latest
