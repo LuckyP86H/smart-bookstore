@@ -358,10 +358,12 @@ function App() {
           username={username}
           password={password}
           onBookClick={(bookId) => {
-            // Scroll to book when clicked from chat recommendations
+            // Scroll to and briefly highlight the book recommended in chat
             const bookElement = document.querySelector(`[data-book-id="${bookId}"]`);
             if (bookElement) {
               bookElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              bookElement.classList.add('book-card-highlight');
+              setTimeout(() => bookElement.classList.remove('book-card-highlight'), 2000);
             }
           }}
         />

@@ -151,3 +151,10 @@
   @apply text-sm font-semibold;
   @apply text-orange-500 dark:text-orange-400;
 }
+
+/* Flash highlight when a book is opened from an AI chat recommendation */
+.book-card-highlight {
+  outline: 3px solid var(--color-primary-500);
+  outline-offset: 2px;
+  transition: outline-color 0.4s ease;
+}

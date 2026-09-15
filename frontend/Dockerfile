@@ -9,9 +9,8 @@ WORKDIR /app
 # If package.json doesn't change, npm install is cached
 COPY frontend/package*.json ./
 
-# Install dependencies
-# Use `npm install` because `package-lock.json` may be absent in the build context
-RUN npm install
+# Install dependencies reproducibly from the lockfile
+RUN npm ci
 
 # Copy the rest of the application
 COPY frontend/ .
@@ -33,7 +32,7 @@ RUN mkdir -p src/gen \
 		--plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
 		--es_out=src/gen --es_opt=target=ts \
 		--connect-es_out=src/gen --connect-es_opt=target=ts \
-		proto/bookstore.proto proto/ai.proto
+		proto/bookstore.proto
 
 # Build the application
 # This creates optimized production files in /app/dist
