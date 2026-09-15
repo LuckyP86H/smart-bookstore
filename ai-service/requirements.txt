@@ -1,6 +1,6 @@
 # FastAPI web framework
 fastapi==0.115.6
-uvicorn[standard]==0.34.0
+uvicorn[standard]==0.52.4
 
 # LiteLLM for LLM provider abstraction
 litellm==1.101.0
