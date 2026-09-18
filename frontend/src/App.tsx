@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createCustomerClient, isMerchantUser } from './api/client';
 import { Book, Genre } from './gen/bookstore_pb';
 import { CartItem } from './types/book';
@@ -69,11 +69,16 @@ function App() {
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(0);
 
-  const customerClient = authenticated ? createCustomerClient(username, password) : null;
-  // Note: merchantClient can be added here when merchant-specific UI features are implemented
-  // const merchantClient = authenticated && isMerchant ? createMerchantClient(username, password) : null;
+  // Memoized so the client identity only changes when credentials do —
+  // loadBooks depends on it, and an unstable client would refetch every render.
+  const customerClient = useMemo(
+    () => (authenticated ? createCustomerClient(username, password) : null),
+    [authenticated, username, password]
+  );
+  // Note: a merchantClient can be added here the same way when merchant-specific
+  // UI features are implemented.
 
-  const loadBooks = async () => {
+  const loadBooks = useCallback(async () => {
     if (!customerClient) return;
 
     setLoading(true);
@@ -115,13 +120,13 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerClient, searchQuery, genreFilter, authorFilter, minPrice, maxPrice]);
 
+  // loadBooks no-ops until a client exists, so this covers login and every
+  // filter change without a separate `authenticated` guard.
   useEffect(() => {
-    if (authenticated) {
-      loadBooks();
-    }
-  }, [authenticated, searchQuery, genreFilter, authorFilter, minPrice, maxPrice]);
+    loadBooks();
+  }, [loadBooks]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
