@@ -1,671 +1,251 @@
-# 📚 Bookstore - ConnectRPC + AI Learning Project
+# 📚 Smart Bookstore
 
-A fullstack bookstore application built to learn modern gRPC development using **ConnectRPC**, **Go**, **React**, and **PostgreSQL**, enhanced with **AI-powered features** using **LLMs** and **vector search**. This project demonstrates production-ready patterns for building type-safe APIs that work natively in browsers, plus real-world AI integration.
+A fullstack bookstore with an AI assistant: a **Go** backend serving type-safe **ConnectRPC** APIs, a **React** frontend, a **Python** AI service for chat and semantic search, and **PostgreSQL + pgvector** for storage.
 
-## 🎯 Learning Objectives
-
-This project teaches:
-- **ConnectRPC**: Modern, browser-friendly alternative to gRPC-Web
-- **Protocol Buffers**: Schema-first API design with code generation
-- **Go Backend**: Building efficient gRPC services
-- **AI Integration**: LLM-powered chat and semantic search
-- **Microservices**: REST communication between Go and Python services
-- **Vector Search**: Embeddings and similarity search with pgvector
-- **Type Safety**: End-to-end type safety from backend to frontend
-- **Authentication**: HTTP Basic Auth with interceptors
-- **Database Patterns**: ACID transactions and race condition handling
-- **Docker**: Container orchestration with docker-compose
+The AI assistant answers natural-language questions ("recommend books about entrepreneurship") by combining vector similarity search over the catalog with an LLM — and the LLM provider is swappable by configuration alone.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
-│  React Frontend │ ───▶ │  Go Backend      │ ───▶ │  PostgreSQL  │
-│  (Port 3000)    │      │  ConnectRPC      │      │  + pgvector  │
-│                 │      │  (Port 8082)     │      │  (Port 5434) │
-│  - TypeScript   │      │  - gRPC Services │      │              │
-│  - Vite         │      │  - Interceptors  │      │  - Books     │
-│  - ConnectRPC   │      │  - AI Handlers   │      │  - Reviews   │
-│    Client       │      │  - Google Books  │      │  - Sales     │
-│  - AI Chat UI   │      │    API           │      │  - Embeddings│
-└─────────────────┘      └────────┬─────────┘      └──────────────┘
-                                  │                         ▲
-                                  │ REST API                │
-                                  ▼                         │
-                         ┌──────────────────┐              │
-                         │  Python AI Svc   │──────────────┘
-                         │  FastAPI         │   pgvector
-                         │  (Port 8000)     │   queries
-                         │                  │
-                         │  - LiteLLM       │
-                         │  - Embeddings    │
-                         │  - Vector Search │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │  Ollama          │
-                         │  llama3.2 (2GB)  │
-                         │  (Port 11434)    │
-                         └──────────────────┘
+   React Frontend
+        │
+        │  ConnectRPC (catalog, cart, reviews)
+        │  REST        (AI chat)
+        ▼
+   Go Backend ──────────────────▶ PostgreSQL + pgvector
+        │                              ▲
+        │  REST                        │  vector + SQL queries
+        ▼                              │
+   Python AI Service ──────────────────┘
+        │
+        │  LiteLLM
+        ▼
+   LLM provider (local Ollama, or a hosted API)
 ```
+
+The Go backend owns all business logic and is the only service the browser talks to. The AI service is internal: it generates embeddings, runs similarity search, and calls the LLM.
 
 ### Technology Stack
 
-| Layer | Technology | Version | Why? |
-|-------|-----------|---------|------|
-| **Frontend** | React | 19.1.4 | Latest stable React |
-| | TypeScript | 5.9.3 | Type safety |
-| | Vite | 7.3.1 | Fast dev server and builds |
-| | ConnectRPC | 1.7.0 | Browser-native gRPC client |
-| **Backend** | Go | 1.25.0 | High performance, great for gRPC |
-| | ConnectRPC Go | 1.19.1 | gRPC server framework |
-| | PostgreSQL Driver | latest | Database connectivity |
-| **AI Service** | Python | 3.11 | Best ecosystem for ML/AI |
-| | FastAPI | 0.115.6 | Modern async Python web framework |
-| | LiteLLM | 1.80.16 | LLM provider abstraction (OpenAI API standard) |
-| | Ollama | 0.13.5 | Local LLM runtime |
-| | llama3.2 | 2GB | Fast, capable open-source LLM |
-| | sentence-transformers | 3.3.1 | Text embeddings (384d vectors) |
-| **Database** | PostgreSQL | 16+ | Reliable, ACID-compliant |
-| | pgvector | 0.8.1 | Vector similarity search extension |
-| **Infrastructure** | Docker | latest | Containerization |
-| | Docker Compose | latest | Multi-container orchestration |
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React, TypeScript, Vite, Tailwind, ConnectRPC client |
+| **Backend** | Go, ConnectRPC, Protocol Buffers |
+| **AI Service** | Python, FastAPI, LiteLLM, sentence-transformers |
+| **Database** | PostgreSQL with the pgvector extension |
+| **Infrastructure** | Docker Compose, GitHub Actions |
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Docker** and **Docker Compose** installed
-- **Ollama** for AI features (install: `brew install ollama`)
-- **(Optional)** Google Books API key for ISBN lookup
-
-### One-Command Startup
+**Prerequisites**: Docker and Docker Compose. For local (free) AI, also [Ollama](https://ollama.com) — otherwise set a hosted provider key, see [Switching LLM providers](#-switching-llm-providers).
 
 ```bash
-# Clone and navigate to project
-cd bookstore
-
-# Start Ollama and pull LLM model (one-time setup)
+# One-time: pull a local model
 ollama serve &
 ollama pull llama3.2
 
-# Start all services (database, backend, ai-service, frontend)
-docker-compose up -d
-
-# Wait 15 seconds for services to start, then open browser
-open http://localhost:3000
-
-# Click the chat button (💬) in bottom right to talk to AI!
+# Start everything, seed books, and generate embeddings
+./scripts/setup-complete.sh
 ```
 
-### Services Running
+Then open <http://localhost:3000>, sign in, and click the assistant button in the bottom-right corner.
 
-| Service | Port | URL | Purpose |
-|---------|------|-----|---------|
-| **Frontend** | 3000 | http://localhost:3000 | React UI |
-| **Backend** | 8082 | http://localhost:8082 | Go API |
-| **AI Service** | 8000 | http://localhost:8000 | Python AI |
-| **AI Docs** | 8000 | http://localhost:8000/docs | Interactive API docs |
-| **Database** | 5434 | localhost:5434 | PostgreSQL |
-| **Ollama** | 11434 | http://localhost:11434 | LLM Runtime |
+To start the stack without seeding, use `docker compose up -d`. The seeding and embedding steps are also available on their own as `./scripts/seed-data.sh` and `./scripts/generate-embeddings.sh`.
 
-### Test Accounts
+### Test accounts
 
-The database automatically seeds these test accounts:
+The database seeds these on first start:
 
-| Username | Password | Role | Use For |
-|----------|----------|------|---------|
-| `merchant1` | `password1` | Merchant | Add books, manage inventory |
-| `merchant2` | `password2` | Merchant | Second merchant for testing |
-| `customer` | `password` | Customer | Browse and purchase books |
+| Username | Password | Role |
+|----------|----------|------|
+| `customer` | `password` | Customer — browse, cart, purchase, review |
+| `merchant1` | `password1` | Merchant — inventory and sales |
+| `merchant2` | `password2` | Merchant — second account for testing |
 
 ---
 
 ## 🤖 AI Features
 
-This project includes **production-ready AI integration** to demonstrate modern LLM and vector search patterns.
+| Feature | How it works |
+|---------|--------------|
+| **Chat assistant** | Detects book-related questions, retrieves relevant titles, and asks the LLM to respond with them in context |
+| **Semantic search** | Ranks books by embedding similarity, so "books about overcoming failure" matches on meaning rather than keywords |
+| **Embeddings** | `sentence-transformers` produces 384-dimension vectors stored in a pgvector column |
 
-### What's Included
+A chat request flows: frontend → Go backend (`/api/ai/chat`, authenticated) → AI service → embedding + pgvector search, then LiteLLM → provider. The reply and the matched books come back together, and clicking a recommendation jumps to that book in the catalog.
 
-| Feature | Technology | Description |
-|---------|-----------|-------------|
-| **💬 AI Chat Assistant** | LiteLLM (Ollama, OpenAI, Anthropic, DeepSeek, Gemini, ...) | Conversational AI for book recommendations |
-| **🔍 Semantic Search** | pgvector + embeddings | Find books by meaning, not just keywords |
-| **📊 Vector Embeddings** | sentence-transformers | 384-dimensional vectors for similarity |
-| **🎯 Smart Recommendations** | LLM + Vector Search | Context-aware book suggestions |
+### 🔌 Switching LLM providers
 
-### Try It
+The AI service talks to every provider through [LiteLLM](https://docs.litellm.ai/), so the backend is chosen by configuration — no code changes. Set `LLM_MODEL` and the matching key in `ai-service/.env` (gitignored; copy `ai-service/.env.example` to start):
 
-1. **Login** as `customer` / `password`
-2. **Click** the chat button (💬) in the bottom right
-3. **Ask** questions like:
-   - "recommend books about entrepreneurship"
-   - "find sci-fi novels"
-   - "books for learning programming"
-4. **Get** AI-powered responses with relevant book suggestions!
-
-### Architecture Highlight
-
-```
-User Question
-    ↓
-Frontend Chat UI
-    ↓ (HTTP + Auth)
-Go Backend (/api/ai/chat)
-    ↓ (REST API)
-Python AI Service
-    ├─→ Generate embeddings → PostgreSQL pgvector
-    │                         (semantic search for relevant books)
-    ├─→ LiteLLM → configured LLM provider
-    │             (Ollama / OpenAI / Anthropic / DeepSeek / Gemini / ...)
-    └─→ Combine results
-         ↓
-AI Response + Book Recommendations
-```
-
-### Switching LLM Providers
-
-The AI service uses [LiteLLM](https://docs.litellm.ai/), so the LLM backend is selected purely by configuration — no code changes. Set `LLM_MODEL` (and the matching API key) in `ai-service/.env` (gitignored):
-
-| Provider | `LLM_MODEL` example | Required env var |
-|----------|--------------------|------------------|
-| Ollama (local, default) | `ollama/llama3.2` | `LLM_API_BASE` (optional) |
+| Provider | `LLM_MODEL` | Credential |
+|----------|-------------|------------|
+| Ollama (local, default) | `ollama/llama3.2` | none; optional `LLM_API_BASE` |
 | OpenAI | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | Anthropic | `claude-sonnet-5` | `ANTHROPIC_API_KEY` |
 | DeepSeek | `deepseek/deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Gemini | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
 
-See `ai-service/.env.example` for the full template.
-
-**Key Learning**: This demonstrates REST communication between microservices, provider-agnostic LLM integration, and vector search — runnable end-to-end with **completely free tools** (Ollama + pgvector).
+Any other LiteLLM-supported model string works the same way. Never commit real keys — `.env` is gitignored and Compose loads it automatically.
 
 ---
 
-## 📖 What is ConnectRPC?
+## 📖 Why ConnectRPC?
 
-**ConnectRPC** is a modern alternative to gRPC-Web that solves a key problem: **gRPC doesn't work in browsers**.
+Browsers can't speak native gRPC — it needs HTTP/2 binary framing that `fetch()` can't produce, which normally forces a translating proxy like Envoy in front of the server.
 
-### The Problem with Traditional gRPC
-
-- gRPC uses HTTP/2 with binary framing
-- Browsers can't generate these requests
-- You need a proxy (like Envoy) to translate
-
-### How ConnectRPC Solves This
-
-1. **Browser-Native**: Works with standard `fetch()` API
-2. **No Proxy Needed**: Direct browser → backend communication
-3. **Protocol Buffers**: Same type safety and code generation
-4. **Interoperable**: Can talk to regular gRPC servers
-
-### Comparison
-
-```
-Traditional gRPC-Web:
-Browser → Envoy Proxy → gRPC Server
-         (translation)
-
-ConnectRPC:
-Browser → ConnectRPC Server
-         (direct!)
-```
+ConnectRPC serves the same Protocol Buffer contract over ordinary HTTP, so the browser calls the backend directly with no proxy, while keeping generated types on both ends. One `.proto` file is the single source of truth: `protoc` generates Go structs and handlers for the backend and TypeScript types and clients for the frontend, so a schema change that breaks the frontend fails at compile time rather than in production.
 
 ---
 
-## 🔍 Project Structure
+## 🗂️ Project Structure
 
 ```
-bookstore/
-├── backend/                  # Go backend with ConnectRPC
-│   ├── proto/
-│   │   └── bookstore.proto  # Protocol Buffer definitions (the schema)
-│   ├── gen/                 # Auto-generated code from .proto
-│   │   ├── bookstore.pb.go  # Go message types
-│   │   └── bookstorev1connect/  # ConnectRPC handlers
-│   ├── services/
-│   │   ├── merchant_service.go  # Merchant RPC implementations
-│   │   └── customer_service.go  # Customer RPC implementations
-│   ├── interceptors/
-│   │   └── auth.go          # Authentication middleware
-│   ├── db/
-│   │   └── database.go      # PostgreSQL operations
-│   ├── external/
-│   │   └── google_books.go  # Google Books API client
-│   ├── server.go            # Main entry point
-│   ├── go.mod               # Go dependencies
-│   └── Dockerfile           # Backend container config
-│
-├── frontend/                 # React frontend
-│   ├── src/
-│   │   ├── gen/             # Auto-generated TypeScript from .proto
-│   │   ├── api/
-│   │   │   └── client.ts    # ConnectRPC client setup
-│   │   ├── components/
-│   │   │   ├── BookCard.tsx # Book display component
-│   │   │   ├── Cart.tsx     # Shopping cart
-│   │   │   └── FilterPanel.tsx  # Search and filters
-│   │   ├── types/
-│   │   │   └── book.ts      # TypeScript type definitions
-│   │   └── App.tsx          # Main application
-│   ├── package.json         # Node dependencies
-│   ├── Dockerfile           # Frontend container config
-│   └── nginx.conf           # Nginx server config
-│
-└── docker-compose.yml       # Orchestrates all services
+backend/                 Go + ConnectRPC
+├── proto/               Protocol Buffer schema (source of truth)
+├── gen/                 Generated Go code (gitignored)
+├── services/            Merchant and customer RPC implementations
+├── handlers/            REST handlers proxying to the AI service
+├── interceptors/        Authentication
+├── db/                  PostgreSQL access and schema setup
+└── external/            Google Books API client
+
+ai-service/              Python + FastAPI
+├── app/config/          Settings, provider resolution
+├── app/services/        Chat, embeddings, vector search
+├── app/models/          Request/response schemas
+└── tests/               Unit tests (heavy deps stubbed)
+
+frontend/                React + TypeScript
+└── src/
+    ├── gen/             Generated TypeScript client (gitignored)
+    ├── api/             ConnectRPC client setup
+    └── components/      Catalog, cart, filters, AI chat
+
+scripts/                 Setup, seeding, embedding generation
+.github/workflows/       CI and deployment pipelines
+docker-compose.yml       Service orchestration
 ```
 
----
-
-## 🎓 Key Learning Points
-
-### 1. Protocol Buffers (Schema-First Design)
-
-**File**: `backend/proto/bookstore.proto`
-
-```protobuf
-// Define your data structures
-message Book {
-  int64 id = 1;
-  string title = 2;
-  string author = 3;
-  Genre genre = 4;
-  double price = 5;
-}
-
-// Define your API
-service CustomerService {
-  rpc GetAvailableBooks(GetAvailableBooksRequest) 
-    returns (GetAvailableBooksResponse);
-}
-```
-
-**Benefits**:
-- ✅ Single source of truth for API contract
-- ✅ Auto-generates code for both backend and frontend
-- ✅ Compile-time type checking
-- ✅ Impossible to have backend/frontend mismatch
-
-### 2. Code Generation
-
-**Backend (Go)**:
-```bash
-protoc --go_out=. --connect-go_out=. bookstore.proto
-```
-Generates:
-- Message types (structs)
-- Service interfaces
-- HTTP handlers
-
-**Frontend (TypeScript)**:
-```bash
-protoc --es_out=. --connect-es_out=. bookstore.proto
-```
-Generates:
-- TypeScript types
-- Client code
-
-### 3. Type-Safe API Calls
-
-**Frontend** (`src/api/client.ts`):
-```typescript
-// Create a typed client
-const client = createCustomerClient("customer", "password");
-
-// All methods are typed!
-const response = await client.getAvailableBooks({
-  searchQuery: "clean code",
-  genreFilter: Genre.TECHNOLOGY,
-  page: 1,
-  pageSize: 20
-});
-
-// response.books is typed as Book[]
-// TypeScript knows all properties!
-```
-
-### 4. Authentication with Interceptors
-
-**Backend** (`interceptors/auth.go`):
-```go
-// Interceptor runs before each RPC call
-func (a *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-  return func(ctx context.Context, req connect.AnyRequest) {
-    // Extract and validate credentials
-    username, password := parseBasicAuth(req.Header())
-    storeID, isCustomer := a.db.Authenticate(username, password)
-    
-    // Add to context for use in handlers
-    ctx = context.WithValue(ctx, StoreIDKey, storeID)
-    
-    return next(ctx, req)  // Continue to handler
-  }
-}
-```
-
-**Similar to Express middleware**:
-```javascript
-app.use((req, res, next) => {
-  // Validate auth
-  req.user = validateAuth(req.headers);
-  next();  // Continue to route handler
-});
-```
-
-### 5. Race Condition Handling
-
-**Database** (`db/database.go`):
-```go
-// Problem: Two customers try to buy the last book
-// Solution: Database transactions with row-level locking
-
-func (d *Database) PurchaseBook(bookID, customerID int64, quantity int32) error {
-  tx, _ := d.db.Begin()
-  defer tx.Rollback()
-  
-  // FOR UPDATE locks the row until transaction completes
-  var stock int32
-  tx.QueryRow(
-    "SELECT stock_quantity FROM books WHERE id = $1 FOR UPDATE",
-    bookID
-  ).Scan(&stock)
-  
-  if stock < quantity {
-    return fmt.Errorf("insufficient stock")
-  }
-  
-  // Update stock and create sale record
-  tx.Exec("UPDATE books SET stock_quantity = stock_quantity - $1 WHERE id = $2",
-    quantity, bookID)
-  tx.Exec("INSERT INTO sales ...")
-  
-  tx.Commit()  // Release lock
-}
-```
+Generated code is not committed — Docker builds and CI run `protoc` themselves.
 
 ---
 
 ## 🛠️ Development
 
-### Local Development (Without Docker)
+The containers are the quickest path, but each service runs standalone.
 
-**Backend**:
+**Backend**
 ```bash
 cd backend
-
-# Install dependencies
-go mod download
-
-# Generate code from proto
 protoc --proto_path=proto \
   --go_out=gen --go_opt=paths=source_relative \
   --connect-go_out=gen --connect-go_opt=paths=source_relative \
   proto/bookstore.proto
-
-# Run server
 go run server.go
-
-# Server starts on http://localhost:8082
 ```
 
-**Frontend**:
+**Frontend**
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Generate TypeScript from proto
 protoc --proto_path=../backend/proto \
   --plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
   --plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
   --es_out=src/gen --es_opt=target=ts \
   --connect-es_out=src/gen --connect-es_opt=target=ts \
   ../backend/proto/bookstore.proto
-
-# Run dev server
 npm run dev
-
-# Frontend starts on http://localhost:3000
 ```
 
-### Database Setup
-
-If running locally without Docker:
+**AI service**
 ```bash
-# Create database
-createdb bookstore
-
-# Set environment variables
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=bookstore
-
-# Schema and seed data are auto-created when backend starts
+cd ai-service
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
----
+### Tests
 
-## 🧪 Testing the API
-
-### Using the Frontend
-
-1. Open http://localhost:3000
-2. Login as `customer` / `password`
-3. Browse books, add to cart, checkout
-4. See real-time stock updates
-
-### Using cURL (ConnectRPC uses standard HTTP)
-
-**Get Available Books**:
 ```bash
-curl -X POST http://localhost:8082/bookstore.v1.CustomerService/GetAvailableBooks \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'customer:password' | base64)" \
-  -d '{
-    "searchQuery": "",
-    "genreFilter": 0,
-    "page": 1,
-    "pageSize": 10
-  }'
+cd backend    && go test ./...                      # Go
+cd ai-service && pip install -r requirements-dev.txt && pytest
+cd frontend   && npm run lint && npm run build      # lint + type check
 ```
 
-**Purchase a Book**:
-```bash
-curl -X POST http://localhost:8082/bookstore.v1.CustomerService/PurchaseBook \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'customer:password' | base64)" \
-  -d '{
-    "bookId": "1",
-    "quantity": 1
-  }'
-```
+The Python tests stub the ML, LLM, and database dependencies, so they run in under a second without a model download or a live database. CI runs all three suites, builds every image, and scans dependencies with Trivy.
 
 ---
 
 ## 📚 API Reference
 
-### Customer Service
+**CustomerService** (ConnectRPC, authenticated): `GetAvailableBooks`, `GetBookDetails`, `PurchaseBook`, `CheckoutCart`, `AddReview`, `GetBookReviews`, `GetPurchaseHistory`
 
-| RPC Method | Description | Auth Required |
-|------------|-------------|---------------|
-| `GetAvailableBooks` | Browse books with filters and pagination | Yes |
-| `GetBookDetails` | Get details of a specific book | Yes |
-| `PurchaseBook` | Buy a single book | Yes |
-| `CheckoutCart` | Purchase multiple books at once | Yes |
-| `AddReview` | Submit a review for a purchased book | Yes |
-| `GetBookReviews` | Get all reviews for a book | Yes |
-| `GetPurchaseHistory` | View your purchase history | Yes |
+**MerchantService** (ConnectRPC, authenticated except the last): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
 
-### Merchant Service
+**AI endpoints** (REST, on the Go backend):
 
-| RPC Method | Description | Auth Required |
-|------------|-------------|---------------|
-| `AddBook` | Add a new book to inventory | Yes |
-| `RemoveBook` | Remove an unsold book | Yes |
-| `UpdateStock` | Add more copies of a book | Yes |
-| `GetMerchantBooks` | View your inventory | Yes |
-| `GetSoldBooks` | View sales history | Yes |
-| `GetLowStockBooks` | Get books below stock threshold | Yes |
-| `LookupBookByISBN` | Fetch book details from Google Books | No |
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `POST /api/ai/chat` | Yes | Chat with the assistant |
+| `POST /api/ai/search/semantic` | No | Semantic catalog search |
+| `GET /api/ai/health` | No | AI service health |
 
----
+ConnectRPC methods are plain HTTP, so they work from `curl`:
 
-## 🔐 Security Features
-
-1. **HTTP Basic Authentication**: Simple but effective for learning
-2. **Role-Based Access Control**: Merchants and customers have different permissions
-3. **Authorization Interceptors**: Every request is authenticated
-4. **Non-Root Docker Containers**: Security best practice
-5. **CORS Configuration**: Prevents unauthorized domains from accessing API
-
-**Production Recommendations**:
-- Use JWT tokens instead of Basic Auth
-- Add rate limiting
-- Enable HTTPS (TLS)
-- Use secrets management for credentials
-
----
-
-## 📊 Database Schema
-
-```sql
--- Users table (stores = merchants and customers)
-CREATE TABLE stores (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    is_customer BOOLEAN NOT NULL DEFAULT false
-);
-
--- Books table
-CREATE TABLE books (
-    id SERIAL PRIMARY KEY,
-    store_id INTEGER REFERENCES stores(id),
-    isbn VARCHAR(20),
-    title VARCHAR(500) NOT NULL,
-    author VARCHAR(255) NOT NULL,
-    genre VARCHAR(50) NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    stock_quantity INTEGER NOT NULL DEFAULT 0,
-    total_sold INTEGER NOT NULL DEFAULT 0,
-    average_rating DECIMAL(3, 2) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Sales table (tracks each purchase)
-CREATE TABLE sales (
-    id SERIAL PRIMARY KEY,
-    book_id INTEGER REFERENCES books(id),
-    customer_id INTEGER REFERENCES stores(id),
-    quantity INTEGER NOT NULL,
-    price_at_purchase DECIMAL(10, 2) NOT NULL,
-    purchased_at TIMESTAMP DEFAULT NOW()
-);
-
--- Reviews table
-CREATE TABLE reviews (
-    id SERIAL PRIMARY KEY,
-    book_id INTEGER REFERENCES books(id),
-    customer_id INTEGER REFERENCES stores(id),
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    review_text TEXT,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(book_id, customer_id)
-);
+```bash
+curl -X POST http://localhost:8082/bookstore.v1.CustomerService/GetAvailableBooks \
+  -H "Content-Type: application/json" \
+  -u customer:password \
+  -d '{"page": 1, "pageSize": 10}'
 ```
+
+---
+
+## 🔐 Security Notes
+
+The stack runs as non-root containers, authenticates every RPC through an interceptor, keeps provider keys out of the repository, returns generic error messages to clients while logging details server-side, and binds the internal AI service to loopback so only the backend can reach it.
+
+This is a demo, not a hardened deployment. Before exposing it publicly, replace Basic Auth with tokens and hashed passwords, enable TLS, restrict CORS to known origins, and move credentials into a secrets manager.
+
+---
+
+## 🗃️ Database Schema
+
+`stores` holds both merchants and customers (`is_customer` distinguishes them). `books` carries catalog data plus an `embedding vector(384)` column for similarity search. `sales` records each purchase, and `reviews` holds one rating per customer per book.
+
+Purchases run inside a transaction using `SELECT ... FOR UPDATE` so two customers buying the last copy can't both succeed. The schema is created automatically on backend startup — see `backend/db/database.go`.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Port Already in Use
+**Port already in use** — change the host-side port mappings in `docker-compose.yml`.
 
-If ports are in use, change them in `docker-compose.yml`:
-```yaml
-services:
-  database:
-    ports:
-      - "5435:5432"  # Change 5434 to 5435
-  
-  backend:
-    ports:
-      - "8083:8082"  # Change 8082 to 8083
-```
+**AI replies but recommends nothing** — embeddings are missing; run `./scripts/generate-embeddings.sh`.
 
-### Database Connection Failed
+**Assistant returns an error** — check the provider config with `docker compose logs ai-service`, and confirm Ollama is running (`ollama serve`) if you're using the local default.
 
-```bash
-# Check if database is running
-docker-compose ps database
+**Frontend can't reach the backend** — verify it's up with `curl http://localhost:8082/api/ai/health`, check `VITE_API_URL` in `frontend/.env.*`, then rebuild with `docker compose build frontend`.
 
-# View database logs
-docker-compose logs database
-
-# Restart database
-docker-compose restart database
-```
-
-### Frontend Can't Connect to Backend
-
-1. Check backend is running: `curl http://localhost:8082`
-2. Check `.env.production` has correct backend URL
-3. Rebuild frontend: `docker-compose build frontend`
+**General checks** — `docker compose ps` for service health, `docker compose logs <service>` for details.
 
 ---
 
-## 📈 Next Steps
+## 📈 Possible Extensions
 
-### Immediate Learning Extensions
-
-1. **Add Server Streaming**: Implement real-time book notifications
-2. **Add Client Streaming**: Batch upload books via CSV
-3. **Add Bidirectional Streaming**: Real-time chat for customer support
-4. **Implement Caching**: Add Redis for frequently accessed data
-5. **Add Metrics**: Instrument with Prometheus
-
-### Production Readiness
-
-1. **Authentication**: Replace Basic Auth with JWT
-2. **TLS**: Enable HTTPS for production
-3. **Logging**: Add structured logging (zerolog)
-4. **Monitoring**: Add health checks and metrics
-5. **Testing**: Add unit and integration tests
-6. **CI/CD**: Set up automated testing and deployment
-
-### AI Features (Your Next Phase)
-
-1. **Smart Search**: Use LLM for natural language book search
-2. **Recommendations**: ML-based book recommendations
-3. **Chatbot**: AI assistant for book discovery
-4. **Vector Search**: Semantic similarity search with pgvector
+- Streaming chat responses, so replies render token by token
+- Conversation memory persisted across sessions
+- Hybrid search blending vector similarity with keyword matching
+- Server streaming for live stock updates
+- Redis caching and Prometheus metrics
 
 ---
 
 ## 📝 License
 
-MIT License - Feel free to use this project for learning!
-
-## 🙏 Acknowledgments
-
-- **ConnectRPC**: https://connectrpc.com/
-- **Protocol Buffers**: https://protobuf.dev/
-- **Google Books API**: https://developers.google.com/books
-
----
-
-## 💡 Key Takeaways
-
-1. **ConnectRPC makes gRPC accessible to browsers** without proxies
-2. **Protocol Buffers provide type safety** across frontend and backend
-3. **Code generation eliminates boilerplate** and prevents bugs
-4. **Interceptors are powerful** for cross-cutting concerns like auth
-5. **Docker makes deployment consistent** across environments
-
-**Happy Learning! 🚀📚**
+MIT — see [LICENSE](LICENSE).
