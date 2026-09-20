@@ -1,6 +1,6 @@
 # Multi-stage build for React frontend
 # Stage 1: Build the React application
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 # Set working directory
 WORKDIR /app
