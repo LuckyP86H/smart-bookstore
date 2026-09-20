@@ -1,6 +1,6 @@
 # Multi-stage build for Go backend
 # Stage 1: Build the Go binary
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git protobuf

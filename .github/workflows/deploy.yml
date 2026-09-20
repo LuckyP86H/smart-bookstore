@@ -23,7 +23,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,7 +38,7 @@ jobs:
       
       - name: Build and push backend
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
@@ -48,7 +48,7 @@ jobs:
       
       - name: Build and push frontend
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           # The frontend Dockerfile needs the repo root as context (it copies
           # backend/proto to generate the TypeScript client)
@@ -61,7 +61,7 @@ jobs:
       
       - name: Build and push AI service
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./ai-service
           push: true
