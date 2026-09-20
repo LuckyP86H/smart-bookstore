@@ -153,12 +153,7 @@ go run server.go
 ```bash
 cd frontend
 npm install
-protoc --proto_path=../backend/proto \
-  --plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
-  --plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
-  --es_out=src/gen --es_opt=target=ts \
-  --connect-es_out=src/gen --connect-es_opt=target=ts \
-  ../backend/proto/bookstore.proto
+npm run generate   # regenerate the TypeScript client from the .proto
 npm run dev
 ```
 
@@ -185,7 +180,7 @@ The Python tests stub the ML, LLM, and database dependencies, so they run in und
 
 **CustomerService** (ConnectRPC, authenticated): `GetAvailableBooks`, `GetBookDetails`, `PurchaseBook`, `CheckoutCart`, `AddReview`, `GetBookReviews`, `GetPurchaseHistory`
 
-**MerchantService** (ConnectRPC, authenticated except the last): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
+**MerchantService** (ConnectRPC, authenticated): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
 
 **AI endpoints** (REST, on the Go backend):
 

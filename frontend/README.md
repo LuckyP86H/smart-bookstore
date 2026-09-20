@@ -6,6 +6,7 @@ React + TypeScript + Vite client for the bookstore. See the [root README](../REA
 
 ```bash
 npm install
+npm run generate # regenerate src/gen from backend/proto (needs protoc)
 npm run dev      # Vite dev server (default http://localhost:5173)
 npm run build    # type check + production build
 npm run lint     # ESLint
@@ -13,7 +14,7 @@ npm run lint     # ESLint
 
 ## Generated client
 
-`src/gen/` is generated from `backend/proto/bookstore.proto` and is not committed. The Docker build and CI run `protoc` themselves; to generate it locally, use the command in the root README's Development section.
+`src/gen/` is generated from `backend/proto/bookstore.proto` by `npm run generate` and is not committed. The Docker build and CI run the same script, so codegen is defined in exactly one place. It uses protobuf-es v2, which emits messages and service descriptors into a single `bookstore_pb.ts`.
 
 ## Layout
 
