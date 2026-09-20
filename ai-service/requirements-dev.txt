@@ -4,7 +4,7 @@
 # versions as requirements.txt — keep them in sync when bumping there.
 # (pip constraint files can't be used here: requirements.txt contains
 # extras like uvicorn[standard], which constraints reject.)
-fastapi==0.115.6
+fastapi==0.141.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv==1.2.3
