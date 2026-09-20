@@ -180,7 +180,7 @@ The Python tests stub the ML, LLM, and database dependencies, so they run in und
 
 **CustomerService** (ConnectRPC, authenticated): `GetAvailableBooks`, `GetBookDetails`, `PurchaseBook`, `CheckoutCart`, `AddReview`, `GetBookReviews`, `GetPurchaseHistory`
 
-**MerchantService** (ConnectRPC, authenticated except the last): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
+**MerchantService** (ConnectRPC, authenticated): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
 
 **AI endpoints** (REST, on the Go backend):
 

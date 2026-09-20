@@ -64,17 +64,6 @@ export function createCustomerClient(username: string, password: string) {
 }
 
 /**
- * Creates a public client for unauthenticated operations
- * Currently used for ISBN lookup which doesn't require authentication
- *
- * @returns Promise-based merchant client without authentication
- */
-export function createPublicMerchantClient() {
-  const transport = createTransport();
-  return createClient(MerchantService, transport);
-}
-
-/**
  * Detects if a username is a merchant account
  * Merchant usernames start with "merchant"
  *
