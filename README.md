@@ -153,12 +153,7 @@ go run server.go
 ```bash
 cd frontend
 npm install
-protoc --proto_path=../backend/proto \
-  --plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
-  --plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
-  --es_out=src/gen --es_opt=target=ts \
-  --connect-es_out=src/gen --connect-es_opt=target=ts \
-  ../backend/proto/bookstore.proto
+npm run generate   # regenerate the TypeScript client from the .proto
 npm run dev
 ```
 

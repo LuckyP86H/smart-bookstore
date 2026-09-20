@@ -7,18 +7,18 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate": "rm -rf src/gen && mkdir -p src/gen && protoc --proto_path=../backend/proto --es_out=src/gen --es_opt=target=ts ../backend/proto/bookstore.proto"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^1.10.0",
-    "@connectrpc/connect": "1.7.0",
-    "@connectrpc/connect-web": "1.7.0",
+    "@bufbuild/protobuf": "^2.15.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-web": "2.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@bufbuild/protoc-gen-es": "^1.10.0",
-    "@connectrpc/protoc-gen-connect-es": "1.7.0",
+    "@bufbuild/protoc-gen-es": "^2.15.0",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.10.1",

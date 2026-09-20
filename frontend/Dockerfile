@@ -15,24 +15,14 @@ RUN npm ci
 # Copy the rest of the application
 COPY frontend/ .
 
-# Install protoc (protobuf compiler) so we can generate TypeScript clients
-# and copy backend proto files into the build context (CI uses repo root)
+# protoc for code generation; the protoc-gen-es plugin comes from npm
 RUN apk add --no-cache protobuf
 
-# Copy backend proto files into the image so protoc can access them
-# when the build context is the repository root (CI will use that).
-COPY backend/proto ./proto
-
-# Generate protobuf TypeScript client code into src/gen using the installed
-# protoc compiler and the npm-installed protoc plugins.
-RUN mkdir -p src/gen \
-	&& protoc \
-		--proto_path=proto \
-		--plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
-		--plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
-		--es_out=src/gen --es_opt=target=ts \
-		--connect-es_out=src/gen --connect-es_opt=target=ts \
-		proto/bookstore.proto
+# Place the schema where the shared `npm run generate` script expects it
+# (../backend/proto relative to /app), so codegen is identical here, in CI,
+# and locally.
+COPY backend/proto /backend/proto
+RUN npm run generate
 
 # Build the application
 # This creates optimized production files in /app/dist
