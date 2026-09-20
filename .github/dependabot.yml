@@ -1,90 +1,143 @@
 version: 2
+
+# Updates are grouped so related bumps arrive as one PR per area. Ungrouped
+# updates land individually, which breaks whenever packages constrain each
+# other — vite needs its plugins to move with it, pytest and pytest-asyncio
+# pin against each other — and each of those PRs fails CI on its own.
 updates:
-  # Backend Go dependencies
+  # ── Backend (Go) ──────────────────────────────────────────────────────
   - package-ecosystem: "gomod"
     directory: "/backend"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "backend"
+    labels: ["dependencies", "backend"]
     commit-message:
       prefix: "chore"
       include: "scope"
-  
-  # Frontend npm dependencies
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  # ── Frontend (npm) ────────────────────────────────────────────────────
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "frontend"
+    labels: ["dependencies", "frontend"]
     commit-message:
       prefix: "chore"
       include: "scope"
-    # Ignore major version updates for stability
+    groups:
+      # Vite and its plugins share peer ranges and must move together
+      build-tooling:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "tailwindcss"
+          - "@tailwindcss/*"
+      # protobuf-es and connect-es are version-locked to each other
+      connectrpc:
+        patterns:
+          - "@connectrpc/*"
+          - "@bufbuild/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      linting:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "typescript-eslint"
+          - "typescript"
+          - "globals"
     ignore:
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
-  
-  # AI Service Python dependencies
+
+  # ── AI service (pip) ──────────────────────────────────────────────────
   - package-ecosystem: "pip"
     directory: "/ai-service"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "ai-service"
+    labels: ["dependencies", "ai-service"]
     commit-message:
       prefix: "chore"
       include: "scope"
-  
-  # GitHub Actions
+    groups:
+      # pytest and pytest-asyncio pin against each other
+      testing:
+        patterns:
+          - "pytest*"
+      runtime:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "pytest*"
+
+  # ── CI (GitHub Actions) ───────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "ci"
+    labels: ["dependencies", "ci"]
     commit-message:
       prefix: "chore"
       include: "scope"
-  
-  # Docker base images
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # ── Base images (Docker) ──────────────────────────────────────────────
+  # One group per service: a base-image bump usually needs matching
+  # dependency changes in that service, so keep each reviewable on its own.
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "docker"
-  
+    labels: ["dependencies", "docker", "backend"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      backend-images:
+        patterns: ["*"]
+
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "docker"
-  
+    labels: ["dependencies", "docker", "frontend"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      frontend-images:
+        patterns: ["*"]
+
   - package-ecosystem: "docker"
     directory: "/ai-service"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "docker"
+    labels: ["dependencies", "docker", "ai-service"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      ai-service-images:
+        patterns: ["*"]
