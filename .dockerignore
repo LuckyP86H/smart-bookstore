@@ -1,0 +1,21 @@
+# Build context for images that use the repo root (the frontend image).
+# Host-side artifacts must not leak in: node_modules carries host-platform
+# native binaries, and a stale src/gen from an older codegen version would
+# be compiled alongside the freshly generated client.
+**/node_modules
+**/dist
+frontend/src/gen
+backend/gen
+
+# Python and editor noise
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.DS_Store
+
+# Never send secrets to the Docker daemon
+**/.env
+**/.env.local
+**/.env.*.local
+
+.git
