@@ -38,7 +38,7 @@ jobs:
       
       - name: Build and push backend
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend
           push: true
@@ -48,7 +48,7 @@ jobs:
       
       - name: Build and push frontend
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           # The frontend Dockerfile needs the repo root as context (it copies
           # backend/proto to generate the TypeScript client)
@@ -61,7 +61,7 @@ jobs:
       
       - name: Build and push AI service
         if: github.event.inputs.environment == 'production'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./ai-service
           push: true
