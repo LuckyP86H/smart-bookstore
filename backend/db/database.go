@@ -706,14 +706,20 @@ func (d *Database) CheckoutCart(customerID int64, items []struct {
 	return sales, nil
 }
 
-func (d *Database) GetSoldBooks(storeID int64, startDate, endDate time.Time) ([]*Sale, error) {
+// GetSoldBooks returns the store's sales, newest first. A nil bound leaves
+// that side of the date range open.
+func (d *Database) GetSoldBooks(storeID int64, startDate, endDate *time.Time) ([]*Sale, error) {
+	// The ::timestamp casts type the parameters even when NULL; it matches
+	// the purchased_at column, which Postgres would otherwise infer anyway.
 	rows, err := d.db.Query(`
-		SELECT s.id, s.book_id, b.title, s.customer_id, st.username, s.quantity, 
+		SELECT s.id, s.book_id, b.title, s.customer_id, st.username, s.quantity,
 			s.price_at_purchase, s.purchased_at
 		FROM sales s
 		JOIN books b ON s.book_id = b.id
 		JOIN stores st ON s.customer_id = st.id
-		WHERE b.store_id = $1 AND s.purchased_at BETWEEN $2 AND $3
+		WHERE b.store_id = $1
+			AND ($2::timestamp IS NULL OR s.purchased_at >= $2::timestamp)
+			AND ($3::timestamp IS NULL OR s.purchased_at <= $3::timestamp)
 		ORDER BY s.purchased_at DESC`,
 		storeID, startDate, endDate,
 	)

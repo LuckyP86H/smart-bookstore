@@ -64,6 +64,18 @@ export function createCustomerClient(username: string, password: string) {
 }
 
 /**
+ * Creates a client for the public ISBN lookup
+ * LookupBookByISBN is the one MerchantService method served without
+ * authentication, so merchants can prefill the add-book form before signing in
+ *
+ * @returns Merchant client that sends no credentials
+ */
+export function createPublicMerchantClient() {
+  const transport = createTransport();
+  return createClient(MerchantService, transport);
+}
+
+/**
  * Detects if a username is a merchant account
  * Merchant usernames start with "merchant"
  *
