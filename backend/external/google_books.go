@@ -49,34 +49,56 @@ type BookInfo struct {
 	Categories      []string
 }
 
-func NewGoogleBooksClient(apiKey string) *GoogleBooksClient {
-	return &GoogleBooksClient{
-		apiKey:  apiKey,
-		baseURL: googleBooksBaseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+// Option configures a GoogleBooksClient.
+type Option func(*GoogleBooksClient)
+
+// WithHTTPClient sets the client used for upstream requests — for tracing,
+// a proxy, or a fake transport in tests. Its Timeout replaces the default.
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *GoogleBooksClient) {
+		if hc != nil {
+			c.httpClient = hc
+		}
 	}
 }
 
+// WithBaseURL points the client at another volumes endpoint, such as a
+// local test server.
+func WithBaseURL(baseURL string) Option {
+	return func(c *GoogleBooksClient) { c.baseURL = baseURL }
+}
+
+func NewGoogleBooksClient(apiKey string, opts ...Option) *GoogleBooksClient {
+	c := &GoogleBooksClient{
+		apiKey:     apiKey,
+		baseURL:    googleBooksBaseURL,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
 // LookupByISBN fetches volume metadata for a normalized ISBN (see
-// NormalizeISBN). Errors never contain the request URL, because the URL
-// carries the API key.
+// NormalizeISBN).
 func (c *GoogleBooksClient) LookupByISBN(ctx context.Context, isbn string) (*BookInfo, error) {
 	params := url.Values{}
 	params.Add("q", "isbn:"+isbn)
-	if c.apiKey != "" {
-		params.Add("key", c.apiKey)
-	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build Google Books request: %w", err)
 	}
+	// The key goes in a header, never the URL: URLs end up in error
+	// messages, proxy logs and traces. Google APIs accept either.
+	if c.apiKey != "" {
+		req.Header.Set("X-goog-api-key", c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// *url.Error quotes the full URL, API key included; keep only the cause.
+		// *url.Error quotes the full request URL; callers only need the cause.
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
 			err = urlErr.Err

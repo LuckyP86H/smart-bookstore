@@ -225,7 +225,7 @@ Purchases run inside a transaction using `SELECT ... FOR UPDATE` so two customer
 
 **Assistant returns an error** — check the provider config with `docker compose logs ai-service`, and confirm Ollama is running (`ollama serve`) if you're using the local default.
 
-**ISBN lookup returns `unavailable`** — without `GOOGLE_BOOKS_API_KEY`, lookups share Google's anonymous daily quota, which runs out. Set the key (see `docker-compose.yml`).
+**ISBN lookup returns `unavailable`** — check `docker compose logs backend` for Google's status. A `400` means the key is invalid; a `429` means quota ran out, which happens quickly without a key because keyless requests share Google's anonymous daily quota. Put `GOOGLE_BOOKS_API_KEY=...` in a `.env` file in the repo root (gitignored; Compose reads it automatically).
 
 **Frontend can't reach the backend** — verify it's up with `curl http://localhost:8082/api/ai/health`, check `VITE_API_URL` in `frontend/.env.*`, then rebuild with `docker compose build frontend`.
 
