@@ -185,7 +185,7 @@ The Python tests stub the ML, LLM, and database dependencies, so they run in und
 
 **CustomerService** (ConnectRPC, authenticated): `GetAvailableBooks`, `GetBookDetails`, `PurchaseBook`, `CheckoutCart`, `AddReview`, `GetBookReviews`, `GetPurchaseHistory`
 
-**MerchantService** (ConnectRPC, authenticated except the last): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
+**MerchantService** (ConnectRPC, authenticated except `LookupBookByISBN`, which is public): `AddBook`, `RemoveBook`, `UpdateStock`, `GetMerchantBooks`, `GetSoldBooks`, `GetLowStockBooks`, `LookupBookByISBN`
 
 **AI endpoints** (REST, on the Go backend):
 
@@ -229,6 +229,8 @@ Purchases run inside a transaction using `SELECT ... FOR UPDATE` so two customer
 **AI replies but recommends nothing** — embeddings are missing; run `./scripts/generate-embeddings.sh`.
 
 **Assistant returns an error** — check the provider config with `docker compose logs ai-service`, and confirm Ollama is running (`ollama serve`) if you're using the local default.
+
+**ISBN lookup returns `unavailable`** — without `GOOGLE_BOOKS_API_KEY`, lookups share Google's anonymous daily quota, which runs out. Set the key (see `docker-compose.yml`).
 
 **Frontend can't reach the backend** — verify it's up with `curl http://localhost:8082/api/ai/health`, check `VITE_API_URL` in `frontend/.env.*`, then rebuild with `docker compose build frontend`.
 

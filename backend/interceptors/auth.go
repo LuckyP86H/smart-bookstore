@@ -7,7 +7,16 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/LuckyP86H/smart-bookstore/db"
+	"github.com/LuckyP86H/smart-bookstore/gen/bookstorev1connect"
 )
+
+// publicProcedures skip authentication entirely. ISBN lookup is public so it
+// can prefill the add-book form before a merchant has signed in; its handler
+// validates input and never echoes upstream errors, since anyone can call it.
+var publicProcedures = map[string]bool{
+	"/grpc.health.v1.Health/Check":                              true,
+	bookstorev1connect.MerchantServiceLookupBookByISBNProcedure: true,
+}
 
 type contextKey string
 
@@ -27,8 +36,7 @@ func NewAuthInterceptor(database *db.Database) *AuthInterceptor {
 
 func (a *AuthInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		// Skip authentication for health checks or public endpoints
-		if req.Spec().Procedure == "/grpc.health.v1.Health/Check" {
+		if publicProcedures[req.Spec().Procedure] {
 			return next(ctx, req)
 		}
 
@@ -80,6 +88,10 @@ func (a *AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 
 func (a *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		if publicProcedures[conn.Spec().Procedure] {
+			return next(ctx, conn)
+		}
+
 		// Extract Basic Auth credentials
 		authHeader := conn.RequestHeader().Get("Authorization")
 		if authHeader == "" {

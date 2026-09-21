@@ -260,7 +260,8 @@ service MerchantService {
   rpc GetSoldBooks(GetSoldBooksRequest) returns (GetSoldBooksResponse);
   rpc GetLowStockBooks(GetLowStockBooksRequest) returns (GetLowStockBooksResponse);
   
-  // External API
+  // External API. Public (no auth) so the add-book form can be prefilled;
+  // accepts ISBN-10 or ISBN-13, hyphens and spaces allowed.
   rpc LookupBookByISBN(LookupBookByISBNRequest) returns (LookupBookByISBNResponse);
 }
 

@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"connectrpc.com/connect"
@@ -186,14 +188,20 @@ func (s *MerchantServiceServer) LookupBookByISBN(
 	ctx context.Context,
 	req *connect.Request[bookstorev1.LookupBookByISBNRequest],
 ) (*connect.Response[bookstorev1.LookupBookByISBNResponse], error) {
-	// This endpoint doesn't require merchant auth (can be used before adding book)
-	if req.Msg.Isbn == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("ISBN is required"))
+	// Public endpoint (see interceptors.publicProcedures): validate strictly,
+	// since the ISBN is embedded in an upstream search query.
+	isbn, err := external.NormalizeISBN(req.Msg.Isbn)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	bookInfo, err := s.googleBooks.LookupByISBN(req.Msg.Isbn)
-	if err != nil {
+	bookInfo, err := s.googleBooks.LookupByISBN(ctx, isbn)
+	if errors.Is(err, external.ErrBookNotFound) {
 		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	if err != nil {
+		log.Printf("ISBN lookup for %s failed: %v", isbn, err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("book lookup service unavailable"))
 	}
 
 	return connect.NewResponse(&bookstorev1.LookupBookByISBNResponse{

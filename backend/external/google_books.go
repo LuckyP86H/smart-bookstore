@@ -1,15 +1,23 @@
 package external
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 )
 
+const googleBooksBaseURL = "https://www.googleapis.com/books/v1/volumes"
+
+// ErrBookNotFound means Google Books has no volume for the ISBN.
+var ErrBookNotFound = errors.New("no book found for this ISBN")
+
 type GoogleBooksClient struct {
 	apiKey     string
+	baseURL    string
 	httpClient *http.Client
 }
 
@@ -43,28 +51,37 @@ type BookInfo struct {
 
 func NewGoogleBooksClient(apiKey string) *GoogleBooksClient {
 	return &GoogleBooksClient{
-		apiKey: apiKey,
+		apiKey:  apiKey,
+		baseURL: googleBooksBaseURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
 }
 
-func (c *GoogleBooksClient) LookupByISBN(isbn string) (*BookInfo, error) {
-	// Build URL
-	baseURL := "https://www.googleapis.com/books/v1/volumes"
+// LookupByISBN fetches volume metadata for a normalized ISBN (see
+// NormalizeISBN). Errors never contain the request URL, because the URL
+// carries the API key.
+func (c *GoogleBooksClient) LookupByISBN(ctx context.Context, isbn string) (*BookInfo, error) {
 	params := url.Values{}
 	params.Add("q", "isbn:"+isbn)
 	if c.apiKey != "" {
 		params.Add("key", c.apiKey)
 	}
 
-	fullURL := fmt.Sprintf("%s?%s", baseURL, params.Encode())
-
-	// Make request
-	resp, err := c.httpClient.Get(fullURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"?"+params.Encode(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch from Google Books API: %w", err)
+		return nil, fmt.Errorf("build Google Books request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		// *url.Error quotes the full URL, API key included; keep only the cause.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return nil, fmt.Errorf("Google Books request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -79,7 +96,7 @@ func (c *GoogleBooksClient) LookupByISBN(isbn string) (*BookInfo, error) {
 	}
 
 	if len(result.Items) == 0 {
-		return nil, fmt.Errorf("no book found with ISBN %s", isbn)
+		return nil, ErrBookNotFound
 	}
 
 	// Extract book info
