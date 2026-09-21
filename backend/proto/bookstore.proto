@@ -132,6 +132,8 @@ message GetMerchantBooksResponse {
 }
 
 message GetSoldBooksRequest {
+  // Optional RFC 3339 bounds, e.g. "2026-01-02T15:04:05Z". Leave either
+  // empty to leave that side of the range open; send neither for all sales.
   string start_date = 1;
   string end_date = 2;
 }

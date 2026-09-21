@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/LuckyP86H/smart-bookstore/external"
 	bookstorev1 "github.com/LuckyP86H/smart-bookstore/gen"
+	"github.com/LuckyP86H/smart-bookstore/interceptors"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -100,5 +101,32 @@ func TestLookupBookByISBNQuotaExhaustedIsUnavailable(t *testing.T) {
 	})
 	if _, err := lookup("9780441172719"); connect.CodeOf(err) != connect.CodeUnavailable {
 		t.Errorf("code = %v, want Unavailable", connect.CodeOf(err))
+	}
+}
+
+func TestGetSoldBooksValidatesDateRange(t *testing.T) {
+	s := &MerchantServiceServer{} // validation fails before any DB access
+	ctx := context.WithValue(context.Background(), interceptors.StoreIDKey, int64(1))
+
+	tests := []struct{ name, start, end string }{
+		{"bad start format", "2026-01-01", ""},
+		{"bad end format", "", "yesterday"},
+		{"start after end", "2026-06-01T00:00:00Z", "2026-01-01T00:00:00Z"},
+	}
+	for _, tt := range tests {
+		_, err := s.GetSoldBooks(ctx, connect.NewRequest(&bookstorev1.GetSoldBooksRequest{StartDate: tt.start, EndDate: tt.end}))
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: code = %v, want InvalidArgument", tt.name, connect.CodeOf(err))
+		}
+	}
+}
+
+func TestParseOptionalTime(t *testing.T) {
+	if got, err := parseOptionalTime("start_date", ""); got != nil || err != nil {
+		t.Errorf(`empty: got %v, %v; want nil, nil (open bound)`, got, err)
+	}
+	got, err := parseOptionalTime("start_date", "2026-01-02T15:04:05Z")
+	if err != nil || got == nil || got.Year() != 2026 {
+		t.Errorf("valid: got %v, %v", got, err)
 	}
 }

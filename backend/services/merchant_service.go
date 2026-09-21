@@ -130,14 +130,16 @@ func (s *MerchantServiceServer) GetSoldBooks(
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("unauthorized"))
 	}
 
-	startDate, err := time.Parse(time.RFC3339, req.Msg.StartDate)
+	startDate, err := parseOptionalTime("start_date", req.Msg.StartDate)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid start_date format"))
+		return nil, err
 	}
-
-	endDate, err := time.Parse(time.RFC3339, req.Msg.EndDate)
+	endDate, err := parseOptionalTime("end_date", req.Msg.EndDate)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid end_date format"))
+		return nil, err
+	}
+	if startDate != nil && endDate != nil && startDate.After(*endDate) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("start_date must not be after end_date"))
 	}
 
 	sales, err := s.db.GetSoldBooks(storeID, startDate, endDate)
@@ -256,4 +258,18 @@ func dbSaleToProto(sale *db.Sale) *bookstorev1.Sale {
 		PriceAtPurchase: sale.PriceAtPurchase,
 		PurchasedAt:     sale.PurchasedAt.Format(time.RFC3339),
 	}
+}
+
+// parseOptionalTime parses an RFC 3339 timestamp filter. Proto3 has no null
+// for strings, so an empty value means the bound is unset.
+func parseOptionalTime(field, value string) (*time.Time, error) {
+	if value == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("invalid %s: expected RFC 3339, e.g. 2026-01-02T15:04:05Z", field))
+	}
+	return &t, nil
 }
