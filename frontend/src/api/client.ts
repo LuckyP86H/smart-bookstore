@@ -4,8 +4,8 @@
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import type { Interceptor, Transport } from "@connectrpc/connect";
-import { MerchantService } from "../gen/bookstore_connect";
-import { CustomerService } from "../gen/bookstore_connect";
+// protoc-gen-es v2 emits service descriptors alongside the messages
+import { MerchantService, CustomerService } from "../gen/bookstore_pb";
 
 // Backend API URL - reads from environment variable or defaults to localhost
 const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8082";
@@ -64,10 +64,11 @@ export function createCustomerClient(username: string, password: string) {
 }
 
 /**
- * Creates a public client for unauthenticated operations
- * Currently used for ISBN lookup which doesn't require authentication
+ * Creates a client for the public ISBN lookup
+ * LookupBookByISBN is the one MerchantService method served without
+ * authentication, so merchants can prefill the add-book form before signing in
  *
- * @returns Promise-based merchant client without authentication
+ * @returns Merchant client that sends no credentials
  */
 export function createPublicMerchantClient() {
   const transport = createTransport();

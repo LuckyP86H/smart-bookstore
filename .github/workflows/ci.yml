@@ -95,14 +95,7 @@ jobs:
 
       - name: Generate protobuf code
         working-directory: ./frontend
-        run: |
-          mkdir -p src/gen
-          protoc --proto_path=../backend/proto \
-            --plugin=protoc-gen-es=./node_modules/.bin/protoc-gen-es \
-            --plugin=protoc-gen-connect-es=./node_modules/.bin/protoc-gen-connect-es \
-            --es_out=src/gen --es_opt=target=ts \
-            --connect-es_out=src/gen --connect-es_opt=target=ts \
-            ../backend/proto/bookstore.proto
+        run: npm run generate
 
       - name: Lint
         working-directory: ./frontend
