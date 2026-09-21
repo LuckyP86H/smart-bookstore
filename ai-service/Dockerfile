@@ -18,8 +18,14 @@ COPY requirements.txt .
 # Everything ships prebuilt wheels, so no compilers or system packages needed
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the embedding model so containers start fast and work offline
+# Bake the embedding model into the image at build time...
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+# ...then stop runtime Hub lookups. Without this the library re-checks
+# huggingface.co on every start: with no network it retries for ~2.5 min
+# before falling back to the cache, and with network an upstream change can
+# swap the model under stored embeddings. Must come after the download above.
+ENV HF_HUB_OFFLINE=1
 
 # Copy application code
 COPY app/ ./app/
