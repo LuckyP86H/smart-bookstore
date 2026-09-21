@@ -81,23 +81,24 @@ func NewGoogleBooksClient(apiKey string, opts ...Option) *GoogleBooksClient {
 }
 
 // LookupByISBN fetches volume metadata for a normalized ISBN (see
-// NormalizeISBN). Errors never contain the request URL, because the URL
-// carries the API key.
+// NormalizeISBN).
 func (c *GoogleBooksClient) LookupByISBN(ctx context.Context, isbn string) (*BookInfo, error) {
 	params := url.Values{}
 	params.Add("q", "isbn:"+isbn)
-	if c.apiKey != "" {
-		params.Add("key", c.apiKey)
-	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build Google Books request: %w", err)
 	}
+	// The key goes in a header, never the URL: URLs end up in error
+	// messages, proxy logs and traces. Google APIs accept either.
+	if c.apiKey != "" {
+		req.Header.Set("X-goog-api-key", c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// *url.Error quotes the full URL, API key included; keep only the cause.
+		// *url.Error quotes the full request URL; callers only need the cause.
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) {
 			err = urlErr.Err

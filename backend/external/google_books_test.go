@@ -66,6 +66,40 @@ func TestLookupByISBNUpstreamStatus(t *testing.T) {
 	}
 }
 
+func TestLookupByISBNSendsKeyInHeaderNotURL(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-goog-api-key"); got != testKey {
+			t.Errorf("X-goog-api-key header = %q, want the configured key", got)
+		}
+		if strings.Contains(r.URL.RawQuery, testKey) || r.URL.Query().Has("key") {
+			t.Errorf("API key leaked into the URL: %s", r.URL.RawQuery)
+		}
+		w.Write([]byte(`{"items":[{"volumeInfo":{"title":"Dune"}}]}`))
+	}))
+	defer srv.Close()
+
+	if _, err := newTestClient(srv.URL).LookupByISBN(context.Background(), "9780441172719"); err != nil {
+		t.Fatalf("LookupByISBN: %v", err)
+	}
+}
+
+func TestLookupByISBNWithoutKeySendsNoKeyHeader(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := r.Header["X-Goog-Api-Key"]; ok {
+			t.Error("sent an X-goog-api-key header with no key configured")
+		}
+		w.Write([]byte(`{"items":[{"volumeInfo":{"title":"Dune"}}]}`))
+	}))
+	defer srv.Close()
+
+	c := external.NewGoogleBooksClient("", external.WithBaseURL(srv.URL))
+	if _, err := c.LookupByISBN(context.Background(), "9780441172719"); err != nil {
+		t.Fatalf("LookupByISBN: %v", err)
+	}
+}
+
 // Regression: transport errors from net/http quote the full request URL,
 // which carries the API key. It must not survive into the returned error.
 func TestLookupByISBNErrorsNeverContainAPIKey(t *testing.T) {
