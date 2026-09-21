@@ -1,0 +1,19 @@
+# Build context: ai-service/. The Dockerfile copies only requirements.txt and
+# app/, but these rules keep local state out of the image even if those COPY
+# lines change. Otherwise a broader COPY would bake .env secrets into images
+# that deploy.yml pushes to a registry.
+
+# Secrets
+.env
+.env.*
+
+# Host bytecode and tooling state. COPY app/ carried the host's __pycache__
+# into the image, so local and CI builds produced different images.
+**/__pycache__
+**/*.pyc
+.venv
+venv
+.pytest_cache
+
+# Not needed at runtime
+tests
