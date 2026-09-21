@@ -1,0 +1,13 @@
+# Build context: backend/. The image regenerates gen/ with protoc, so a local
+# copy must not leak in: `COPY . .` would carry a stale file from a removed
+# .proto into the build, to be compiled alongside the fresh output. The
+# frontend image already guards against the same thing (see /.dockerignore).
+gen/
+
+# Local build and test artifacts
+bookstore-server
+*.test
+*.out
+
+# Secrets
+.env
