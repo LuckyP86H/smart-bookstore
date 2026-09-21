@@ -49,14 +49,35 @@ type BookInfo struct {
 	Categories      []string
 }
 
-func NewGoogleBooksClient(apiKey string) *GoogleBooksClient {
-	return &GoogleBooksClient{
-		apiKey:  apiKey,
-		baseURL: googleBooksBaseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+// Option configures a GoogleBooksClient.
+type Option func(*GoogleBooksClient)
+
+// WithHTTPClient sets the client used for upstream requests — for tracing,
+// a proxy, or a fake transport in tests. Its Timeout replaces the default.
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *GoogleBooksClient) {
+		if hc != nil {
+			c.httpClient = hc
+		}
 	}
+}
+
+// WithBaseURL points the client at another volumes endpoint, such as a
+// local test server.
+func WithBaseURL(baseURL string) Option {
+	return func(c *GoogleBooksClient) { c.baseURL = baseURL }
+}
+
+func NewGoogleBooksClient(apiKey string, opts ...Option) *GoogleBooksClient {
+	c := &GoogleBooksClient{
+		apiKey:     apiKey,
+		baseURL:    googleBooksBaseURL,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // LookupByISBN fetches volume metadata for a normalized ISBN (see
