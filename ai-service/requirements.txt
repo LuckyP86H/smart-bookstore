@@ -1,12 +1,12 @@
 # FastAPI web framework
-fastapi==0.141.1
-uvicorn[standard]==0.53.0
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
 
 # LiteLLM for LLM provider abstraction
-litellm==1.101.0
+litellm==1.103.2
 
 # Sentence transformers for embeddings
-sentence-transformers==6.0.1
+sentence-transformers==6.1.0
 
 # PostgreSQL adapter with pgvector support
 psycopg2-binary==2.9.13
@@ -19,4 +19,4 @@ pydantic-settings==2.15.0
 httpx>=0.28.1,<1.0
 
 # Python dotenv for environment variables
-python-dotenv==1.2.3
+python-dotenv==1.2.4
