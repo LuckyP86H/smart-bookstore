@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "test -f src/gen/bookstore_pb.ts || npm run generate",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate": "rm -rf src/gen && mkdir -p src/gen && protoc --proto_path=../backend/proto --es_out=src/gen --es_opt=target=ts ../backend/proto/bookstore.proto"
+    "generate": "rm -rf src/gen && mkdir -p src/gen && export PATH=\"$PATH:/tmp/protoc/bin\" && (command -v protoc >/dev/null 2>&1 || (curl -sSL https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protoc-33.4-linux-x86_64.zip -o /tmp/protoc.zip && unzip -q -o /tmp/protoc.zip -d /tmp/protoc)) && protoc --proto_path=../backend/proto --es_out=src/gen --es_opt=target=ts ../backend/proto/bookstore.proto"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.16.0",
