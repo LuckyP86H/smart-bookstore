@@ -9,6 +9,8 @@ pydantic==2.14.1
 pydantic-settings==2.16.0
 python-dotenv==1.2.4
 httpx>=0.28.1,<1.0
+# Same certifi floor as requirements.txt (eMudhra/emSign CA incident).
+certifi>=2026.10.19
 
 pytest==9.1.1
 pytest-asyncio==1.4.0
