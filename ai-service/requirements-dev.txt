@@ -4,13 +4,13 @@
 # versions as requirements.txt — keep them in sync when bumping there.
 # (pip constraint files can't be used here: requirements.txt contains
 # extras like uvicorn[standard], which constraints reject.)
-fastapi==0.143.2
+fastapi==0.161.1
 pydantic==2.14.1
-pydantic-settings==2.16.0
+pydantic-settings==2.16.1
 python-dotenv==1.2.4
 httpx>=0.28.1,<1.0
 # Same certifi floor as requirements.txt (eMudhra/emSign CA incident).
-certifi>=2026.10.19
+certifi>=2026.10.23
 
 pytest==9.1.1
 pytest-asyncio==1.4.0
