@@ -18,10 +18,11 @@ pydantic-settings==2.16.1
 # HTTP client for health checks (litellm also depends on it)
 httpx>=0.28.1,<1.0
 
+# CA bundle — pinned at/above the post-incident floor (eMudhra/emSign CA
+# incident, Oct 2026): certifi releases before 2026.10.19 still trust the
+# compromised emSign intermediate CAs. httpx/requests pull certifi in
+# transitively; pinning it here stops the version floating with build date.
+certifi>=2026.10.19
+
 # Python dotenv for environment variables
 python-dotenv==1.2.4
-
-# CA bundle — floored at/above the post-incident minimum (eMudhra/emSign
-# CA incident, Oct 2026); same floor as PR #43. httpx/requests pull certifi
-# in transitively; pinning it here stops the version floating.
-certifi>=2026.10.19
