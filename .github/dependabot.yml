@@ -56,8 +56,14 @@ updates:
           - "@eslint/*"
           - "eslint-plugin-*"
           - "typescript-eslint"
-          - "typescript"
           - "globals"
+      # typescript travels separately from typescript-eslint: TS majors
+      # land before typescript-eslint's peer range covers them (the TS 7 /
+      # typescript-eslint <6.1.0 peer conflict that stalled PR #32), so a
+      # shared group makes the whole linting PR unmergeable.
+      typescript:
+        patterns:
+          - "typescript"
     ignore:
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
