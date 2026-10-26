@@ -4,11 +4,16 @@
 # versions as requirements.txt — keep them in sync when bumping there.
 # (pip constraint files can't be used here: requirements.txt contains
 # extras like uvicorn[standard], which constraints reject.)
-fastapi==0.143.2
+fastapi==0.162.0
 pydantic==2.14.1
-pydantic-settings==2.16.0
+pydantic-settings==2.16.1
 python-dotenv==1.2.4
 httpx>=0.28.1,<1.0
 
 pytest==9.1.1
-pytest-asyncio==1.4.0
+pytest-asyncio==1.4.1
+
+# CA bundle — floored at/above the post-incident minimum (eMudhra/emSign
+# CA incident, Oct 2026); same floor as PR #43. httpx/requests pull certifi
+# in transitively; pinning it here stops the version floating.
+certifi>=2026.10.19
