@@ -22,7 +22,7 @@ httpx>=0.28.1,<1.0
 # incident, Oct 2026): certifi releases before 2026.10.19 still trust the
 # compromised emSign intermediate CAs. httpx/requests pull certifi in
 # transitively; pinning it here stops the version floating with build date.
-certifi>=2026.10.19
+certifi>=2026.10.23
 
 # Python dotenv for environment variables
 python-dotenv==1.2.4
