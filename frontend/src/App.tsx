@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createCustomerClient, isMerchantUser } from './api/client';
 import { Book, Genre } from './gen/bookstore_pb';
 import { CartItem } from './types/book';
@@ -53,10 +53,17 @@ function App() {
   // If there's a saved session, we need password to resume
   const [pendingSession, setPendingSession] = useState<SessionData | null>(savedSession);
 
-  const [books, setBooks] = useState<Book[]>([]);
+  // The book list is stored as the outcome of the last completed fetch,
+  // tagged with the key of the request that produced it. `books`, `loading`
+  // and the visible `error` are derived from that during render (below), so
+  // the fetch effect never has to set state synchronously.
+  const [booksResult, setBooksResult] = useState<{
+    key: string;
+    books: Book[];
+    error: string | null;
+  } | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState(savedSession?.username ?? '');
   const [password, setPassword] = useState('');
@@ -70,7 +77,8 @@ function App() {
   const [maxPrice, setMaxPrice] = useState(0);
 
   // Memoized so the client identity only changes when credentials do —
-  // loadBooks depends on it, and an unstable client would refetch every render.
+  // the fetch effect depends on it, and an unstable client would refetch
+  // every render.
   const customerClient = useMemo(
     () => (authenticated ? createCustomerClient(username, password) : null),
     [authenticated, username, password]
@@ -78,55 +86,92 @@ function App() {
   // Note: a merchantClient can be added here the same way when merchant-specific
   // UI features are implemented.
 
-  const loadBooks = useCallback(async () => {
+  // Identifies the current book-list request (user + filters + manual
+  // refreshes). A stored result only counts as current while its key matches.
+  const booksKey = JSON.stringify([
+    username,
+    searchQuery,
+    genreFilter,
+    authorFilter,
+    minPrice,
+    maxPrice,
+    refreshTick,
+  ]);
+
+  const books = booksResult?.books ?? [];
+  // A fetch is outstanding whenever a client exists but no result for the
+  // current key has landed yet — this replaces the old `loading` flag that
+  // was set synchronously at the start of every fetch.
+  const loading = customerClient !== null && booksResult?.key !== booksKey;
+  // An error is only shown for the request it belongs to: while a newer
+  // fetch is in flight the previous error is hidden, matching the old
+  // behaviour of clearing the error at the start of every fetch.
+  const error =
+    booksResult !== null && booksResult.key === booksKey ? booksResult.error : null;
+
+  // Event handlers (buy / checkout) bump the tick to re-run the fetch
+  // effect for the same filters.
+  const reloadBooks = () => setRefreshTick(tick => tick + 1);
+
+  // Fetch the book list on login and on every filter change. All state
+  // updates happen after the await, in the async continuation — nothing
+  // sets state synchronously in the effect (react-hooks/set-state-in-effect).
+  // The cancelled flag drops a stale response when a newer request has
+  // already superseded this one.
+  useEffect(() => {
     if (!customerClient) return;
 
-    setLoading(true);
-    setError(null);
+    let cancelled = false;
+    const fetchKey = booksKey;
 
-    try {
-      const response = await customerClient.getAvailableBooks({
-        searchQuery,
-        genreFilter,
-        authorFilter,
-        minPrice,
-        maxPrice,
-        sortOrder: 0,
-        page: 1,
-        pageSize: 50,
-      });
-      setBooks(response.books);
+    (async () => {
+      try {
+        const response = await customerClient.getAvailableBooks({
+          searchQuery,
+          genreFilter,
+          authorFilter,
+          minPrice,
+          maxPrice,
+          sortOrder: 0,
+          page: 1,
+          pageSize: 50,
+        });
+        if (cancelled) return;
+        setBooksResult({ key: fetchKey, books: response.books, error: null });
 
-      // Update cart items with fresh book data to sync stock quantities
-      setCart(prevCart => {
-        const bookMap = new Map(response.books.map(book => [book.id.toString(), book]));
-        return prevCart
-          .map(item => {
-            const updatedBook = bookMap.get(item.book.id.toString());
-            if (updatedBook) {
-              // Adjust quantity if it exceeds new stock
-              const newQuantity = Math.min(item.quantity, updatedBook.stockQuantity);
-              return newQuantity > 0
-                ? { ...item, book: updatedBook, quantity: newQuantity }
-                : null;
-            }
-            // Remove items for books no longer available
-            return null;
-          })
-          .filter((item): item is CartItem => item !== null);
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load books');
-    } finally {
-      setLoading(false);
-    }
-  }, [customerClient, searchQuery, genreFilter, authorFilter, minPrice, maxPrice]);
+        // Update cart items with fresh book data to sync stock quantities
+        setCart(prevCart => {
+          const bookMap = new Map(response.books.map(book => [book.id.toString(), book]));
+          return prevCart
+            .map(item => {
+              const updatedBook = bookMap.get(item.book.id.toString());
+              if (updatedBook) {
+                // Adjust quantity if it exceeds new stock
+                const newQuantity = Math.min(item.quantity, updatedBook.stockQuantity);
+                return newQuantity > 0
+                  ? { ...item, book: updatedBook, quantity: newQuantity }
+                  : null;
+              }
+              // Remove items for books no longer available
+              return null;
+            })
+            .filter((item): item is CartItem => item !== null);
+        });
+      } catch (err) {
+        if (cancelled) return;
+        // Keep showing the previously loaded books alongside the error.
+        setBooksResult(prev => ({
+          key: fetchKey,
+          books: prev?.books ?? [],
+          error: err instanceof Error ? err.message : 'Failed to load books',
+        }));
+      }
+    })();
 
-  // loadBooks no-ops until a client exists, so this covers login and every
-  // filter change without a separate `authenticated` guard.
-  useEffect(() => {
-    loadBooks();
-  }, [loadBooks]);
+    return () => {
+      cancelled = true;
+    };
+  }, [customerClient, booksKey, searchQuery, genreFilter, authorFilter, minPrice, maxPrice]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +190,7 @@ function App() {
     setUsername('');
     setPassword('');
     setIsMerchant(false);
-    setBooks([]);
+    setBooksResult(null);
     setCart([]);
     setPendingSession(null); // Clear pending session
     // Clear session from localStorage
@@ -212,7 +257,7 @@ function App() {
         quantity: 1,
       });
       alert(`Successfully purchased "${book.title}"!`);
-      loadBooks(); // Refresh book list
+      reloadBooks(); // Refresh book list
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Purchase failed');
     }
@@ -230,7 +275,7 @@ function App() {
       });
       alert('Successfully checked out!');
       setCart([]);
-      loadBooks(); // Refresh book list
+      reloadBooks(); // Refresh book list
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Checkout failed');
     }
