@@ -30,7 +30,11 @@ def test_unknown_env_keys_are_ignored():
     assert s.llm_model  # settings object constructed fine
 
 
-def test_defaults_are_local_dev_friendly():
+def test_defaults_are_local_dev_friendly(monkeypatch):
+    # settings.py exports .env into os.environ at import, and pydantic reads
+    # os.environ even when _env_file=None, so clear the variables under test.
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_API_BASE", raising=False)
     s = Settings(_env_file=None)
     assert s.llm_model == "ollama/llama3.2"
     assert s.embedding_dimension == 384

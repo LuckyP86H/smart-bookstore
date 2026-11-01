@@ -32,6 +32,7 @@ func main() {
 	dbUser := getEnv("DB_USER", "postgres")
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "bookstore")
+	dbSSLMode := getEnv("DB_SSLMODE", "require") // Supabase requires TLS; compose sets "disable" locally
 	googleBooksAPIKey := getEnv("GOOGLE_BOOKS_API_KEY", "")
 	aiServiceURL := getEnv("AI_SERVICE_URL", "http://localhost:8000")
 	port := getEnv("PORT", "8082")
@@ -39,7 +40,7 @@ func main() {
 	// Initialize database connection
 	// The database layer handles schema initialization and auto-seeding test accounts
 	log.Println("Connecting to database...")
-	database, err := db.NewDatabase(dbHost, dbPort, dbUser, dbPassword, dbName)
+	database, err := db.NewDatabase(dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}

@@ -2,19 +2,24 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Database struct {
 	db *sql.DB
 }
 
-func NewDatabase(host, port, user, password, dbname string) (*Database, error) {
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+// NewDatabase connects to Postgres. sslmode follows libpq rules: "require"
+// for Supabase (TLS, no certificate verification), "verify-full" once the
+// CA certificate is configured, "disable" only for the local compose database.
+func NewDatabase(host, port, user, password, dbname, sslmode string) (*Database, error) {
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -160,8 +165,12 @@ func (d *Database) seedAccounts() error {
 			return err
 		}
 		if !exists {
-			_, err := d.db.Exec("INSERT INTO stores (username, password, is_customer) VALUES ($1, $2, $3)",
-				acc.username, acc.password, acc.isCustomer)
+			hash, err := bcrypt.GenerateFromPassword([]byte(acc.password), bcrypt.DefaultCost)
+			if err != nil {
+				return err
+			}
+			_, err = d.db.Exec("INSERT INTO stores (username, password, is_customer) VALUES ($1, $2, $3)",
+				acc.username, string(hash), acc.isCustomer)
 			if err != nil {
 				return err
 			}
@@ -195,8 +204,15 @@ func (d *Database) AuthenticateStore(username, password string) (int64, bool, er
 		return 0, false, err
 	}
 
-	if storedPassword != password {
+	// Stored values are bcrypt hashes. A mismatch is a normal "wrong password";
+	// any other error means the stored value isn't a valid hash, which is a
+	// server-side problem and is returned as an error.
+	err = bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(password))
+	if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
 	}
 
 	return storeID, isCustomer, nil
