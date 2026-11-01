@@ -1,0 +1,60 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "smart-bookstore",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-10-25",
+  "observability": { "enabled": true },
+
+  // The React build (see "build" in package.json). The Worker runs first only
+  // for API paths; every other request is answered from these static assets.
+  "assets": {
+    "directory": "./frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/bookstore.v1.*", "/api/*"]
+  },
+
+  // Two containers, each a Durable Object class exported from worker/src/index.ts.
+  // Each image builds from its own folder (the Dockerfiles expect that context).
+  "containers": [
+    {
+      "class_name": "BackendContainer",
+      "image": "./backend/Dockerfile",
+      "image_build_context": "./backend",
+      "max_instances": 1,
+      "instance_type": "basic"
+    },
+    {
+      // torch + the embedding model need more than the 1 GiB "basic" size.
+      "class_name": "AiServiceContainer",
+      "image": "./ai-service/Dockerfile",
+      "image_build_context": "./ai-service",
+      "max_instances": 1,
+      "instance_type": "standard-1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "BACKEND", "class_name": "BackendContainer" },
+      { "name": "AI_SERVICE", "class_name": "AiServiceContainer" }
+    ]
+  },
+  "exports": {
+    "BackendContainer": { "type": "durable-object", "storage": "sqlite" },
+    "AiServiceContainer": { "type": "durable-object", "storage": "sqlite" }
+  },
+
+  // Non-secret settings. Confirm DB_HOST / DB_USER in the Supabase dashboard:
+  // Connect → Session pooler (the direct host is IPv6-only).
+  // Secrets are NOT here; set DB_PASSWORD and OLLAMA_API_KEY in the Cloudflare
+  // dashboard (Settings → Variables and Secrets), see DEPLOY.md.
+  "vars": {
+    "DB_HOST": "aws-0-ca-central-1.pooler.supabase.com",
+    "DB_PORT": "5432",
+    "DB_USER": "postgres.lakylendodavkbagffqc",
+    "DB_NAME": "postgres",
+    "DB_SSLMODE": "require",
+    "LLM_MODEL": "ollama/beam:cloud",
+    "LLM_API_BASE": "https://ollama.com"
+  }
+}

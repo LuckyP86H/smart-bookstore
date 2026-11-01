@@ -58,3 +58,8 @@ coverage/
 
 # Misc
 *.sqlite
+
+# Cloudflare Worker (repo root)
+node_modules/
+.wrangler/
+.dev.vars
