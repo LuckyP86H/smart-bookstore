@@ -56,6 +56,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: bookstore
+      DB_SSLMODE: disable            # Local database has no TLS; Supabase needs "require"
       PORT: 8082
       AI_SERVICE_URL: http://ai-service:8000  # Internal service URL
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}  # Optional API key
@@ -107,6 +108,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-ollama/llama3.2}
       # Ollama runs on the host machine, accessible via host.docker.internal
       LLM_API_BASE: ${LLM_API_BASE:-http://host.docker.internal:11434}
+      DB_SSLMODE: disable
       PORT: 8000
     
     # Loopback-only mapping: host scripts can reach http://localhost:8000,

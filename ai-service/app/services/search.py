@@ -25,6 +25,10 @@ def get_db_connection():
         database=settings.db_name,
         user=settings.db_user,
         password=settings.db_password,
+        sslmode=settings.db_sslmode,
+        # Supabase installs pgvector in the "extensions" schema, so the
+        # <=> operator only resolves when that schema is on the search path
+        options="-c search_path=public,extensions",
         cursor_factory=RealDictCursor  # Return rows as dictionaries
     )
 
