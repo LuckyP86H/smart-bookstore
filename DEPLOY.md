@@ -17,8 +17,11 @@ One Worker (`worker/src/index.ts`, configured by `wrangler.jsonc`) fronts everyt
 3. **Cloudflare Worker `smart-bookstore` → Settings → Build:**
    - Root directory: `/`
    - Build command: `npm run build`
-   - Deploy command: `npx wrangler deploy`
-   - Production branch: the branch you want live. Non-production branches run `wrangler versions upload`, which does **not** build or roll out container images.
+   - Deploy command: `npx wrangler deploy` (**`npx`**, not `npm`; `npm wrangler deploy` is not a command)
+   - Version command: `npx wrangler versions upload`. This is the command for builds of non-production branches. It uploads a preview version of the Worker without making it live. It does **not** build or roll out the container images, so a feature branch will not get working containers from it.
+   - Production branch (Settings → Build → Branch control): the branch you want live. To deploy from `feat/supabase-and-cloudflare`, either set it as the production branch temporarily or merge to `main`.
+
+   **Why one Root directory, not one per service:** a Worker has exactly one build, and Root directory is a single path (semicolons are not supported). This repo is one Worker that owns all three parts, so `/` is right. The build command only builds the frontend; Wrangler builds the Go and AI images itself from `backend/Dockerfile` and `ai-service/Dockerfile` during `npx wrangler deploy`. Separate Workers (each with its own root directory) would only be needed if you wanted to deploy the services independently.
 4. **Cloudflare Worker → Settings → Variables and Secrets.** Add these as type **Secret**:
    - `DB_PASSWORD`: the Supabase database password
    - `OLLAMA_API_KEY`: your Ollama API key
