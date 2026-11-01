@@ -28,7 +28,9 @@ One Worker (`worker/src/index.ts`, configured by `wrangler.jsonc`) fronts everyt
    - `GOOGLE_BOOKS_API_KEY` (optional): enables ISBN lookup quota
 5. Push to the production branch. The first deploy builds both container images, so it takes a while, and the containers can need several more minutes after the Worker URL goes live.
 
-Containers need a Cloudflare plan that includes them; check **Workers & Pages → Containers** if the deploy is rejected.
+Containers require the **Workers Paid** plan (the Cloudflare dashboard asks for the upgrade). Without it the first deploy cannot create the container applications.
+
+**Do the setup above before the first deploy.** A build that runs with the placeholder settings fails immediately (for example, the default `*` deploy command dies with `LICENSE: not found`), and one without the secrets deploys but cannot reach the database. Watch the first deploy: the pieces that can only be proven live are Cloudflare's image builds, the TLS handshake to the Supabase pooler, the private Go-to-AI hop, and the AI model's load time against the 180 s port-ready timeout.
 
 ## Check it works
 
@@ -66,6 +68,18 @@ The database starts empty. After deploy, add books as a merchant in the UI, or r
 ## Changing the LLM provider
 
 Edit `LLM_MODEL` in `wrangler.jsonc` (for example `gpt-4o-mini`) and add that provider's key as a secret (`OPENAI_API_KEY`). The AI container only receives the variables listed in `worker/src/index.ts`, so add the new key name there too.
+
+## Who owns the schema
+
+In Supabase the tables come from `supabase/migrations/`, so the Worker sets `DB_INIT_SCHEMA=false` and the Go backend does not run its own `CREATE TABLE` / index DDL. The local compose database has no migrations, so it keeps the default (`true`) and the backend creates the tables on startup. Seeded accounts are created either way.
+
+## Upgrading an existing local database
+
+Passwords are now stored as bcrypt hashes. A `stores` row created before this change holds a plaintext password, so that account's logins fail with a server error (the backend log says `not a valid bcrypt hash`). Reseed it: run `docker compose down -v` for a fresh database, or delete the old seeded rows from `stores` and restart so they are recreated hashed. The fresh Supabase database is unaffected.
+
+## Why not Hyperdrive?
+
+Cloudflare Hyperdrive pools Postgres connections for code running in a Worker, through a binding. Here the database clients are the Go and AI containers, which connect straight to Supabase's session pooler, and that pooler already does the pooling. Hyperdrive was considered and not needed.
 
 ## Local development is unchanged
 

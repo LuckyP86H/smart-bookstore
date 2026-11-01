@@ -33,6 +33,9 @@ func main() {
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "bookstore")
 	dbSSLMode := getEnv("DB_SSLMODE", "require") // Supabase requires TLS; compose sets "disable" locally
+	// Create tables on startup. Supabase deployments set DB_INIT_SCHEMA=false because
+	// supabase/migrations/ owns the schema there; local compose keeps the default.
+	dbInitSchema := getEnv("DB_INIT_SCHEMA", "true") != "false"
 	googleBooksAPIKey := getEnv("GOOGLE_BOOKS_API_KEY", "")
 	aiServiceURL := getEnv("AI_SERVICE_URL", "http://localhost:8000")
 	port := getEnv("PORT", "8082")
@@ -40,7 +43,7 @@ func main() {
 	// Initialize database connection
 	// The database layer handles schema initialization and auto-seeding test accounts
 	log.Println("Connecting to database...")
-	database, err := db.NewDatabase(dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
+	database, err := db.NewDatabase(dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode, dbInitSchema)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -106,9 +109,6 @@ func main() {
 	log.Printf("🚀 ConnectRPC server listening on http://localhost:%s", port)
 	log.Printf("   Merchant Service: %s", merchantPath)
 	log.Printf("   Customer Service: %s", customerPath)
-	log.Println("\n📝 Test accounts:")
-	log.Println("   Merchants: merchant1:password1, merchant2:password2")
-	log.Println("   Customer: customer:password")
 
 	// Serve in a goroutine so we can shut down gracefully on SIGINT/SIGTERM.
 	// Graceful shutdown lets in-flight requests finish during rolling deploys.

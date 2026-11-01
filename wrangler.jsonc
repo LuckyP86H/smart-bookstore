@@ -54,6 +54,8 @@
     "DB_USER": "postgres.lakylendodavkbagffqc",
     "DB_NAME": "postgres",
     "DB_SSLMODE": "require",
+    // The schema comes from supabase/migrations/, so the Go backend must not create tables itself.
+    "DB_INIT_SCHEMA": "false",
     "LLM_MODEL": "ollama/beam:cloud",
     "LLM_API_BASE": "https://ollama.com"
   }

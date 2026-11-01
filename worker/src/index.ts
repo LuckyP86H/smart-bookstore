@@ -25,6 +25,7 @@ export interface Env {
   DB_USER: string;
   DB_NAME: string;
   DB_SSLMODE: string;
+  DB_INIT_SCHEMA: string;
   LLM_MODEL: string;
   LLM_API_BASE: string;
 
@@ -64,6 +65,7 @@ export class BackendContainer extends Container<Env> {
         "DB_USER",
         "DB_NAME",
         "DB_SSLMODE",
+        "DB_INIT_SCHEMA",
         "DB_PASSWORD",
         "GOOGLE_BOOKS_API_KEY",
       ]),

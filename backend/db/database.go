@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -14,10 +15,17 @@ type Database struct {
 	db *sql.DB
 }
 
+// dummyHash is compared against when a username doesn't exist, so a login for
+// an unknown user costs the same bcrypt work as one with a wrong password and
+// response timing doesn't reveal which usernames exist.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("timing-equalizer"), bcrypt.DefaultCost)
+
 // NewDatabase connects to Postgres. sslmode follows libpq rules: "require"
 // for Supabase (TLS, no certificate verification), "verify-full" once the
 // CA certificate is configured, "disable" only for the local compose database.
-func NewDatabase(host, port, user, password, dbname, sslmode string) (*Database, error) {
+// applySchema creates the tables on startup; Supabase deployments pass false
+// because supabase/migrations/ owns the schema there.
+func NewDatabase(host, port, user, password, dbname, sslmode string, applySchema bool) (*Database, error) {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
 
@@ -37,8 +45,10 @@ func NewDatabase(host, port, user, password, dbname, sslmode string) (*Database,
 	}
 
 	database := &Database{db: db}
-	if err := database.initSchema(); err != nil {
-		return nil, err
+	if applySchema {
+		if err := database.initSchema(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := database.seedAccounts(); err != nil {
@@ -198,6 +208,8 @@ func (d *Database) AuthenticateStore(username, password string) (int64, bool, er
 	).Scan(&storeID, &storedPassword, &isCustomer)
 
 	if err == sql.ErrNoRows {
+		// Spend the same bcrypt time as a wrong password (see dummyHash).
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 		return 0, false, nil
 	}
 	if err != nil {
@@ -212,6 +224,8 @@ func (d *Database) AuthenticateStore(username, password string) (int64, bool, er
 		return 0, false, nil
 	}
 	if err != nil {
+		// Typically an account created before bcrypt hashing (plaintext value).
+		log.Printf("stores.password for %q is not a valid bcrypt hash; reseed that account: %v", username, err)
 		return 0, false, err
 	}
 
