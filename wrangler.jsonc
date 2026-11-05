@@ -18,6 +18,20 @@
     }
   ],
 
+  // Login rate limiting (Workers rate-limiting binding; GA and available
+  // on the Free plan — verified live on this account 2026-11-05, see
+  // DEPLOY.md "Route B P2"). Provisioned automatically from this config
+  // at deploy time; nothing to create in the dashboard. Enforced in
+  // worker/src/auth/rate-limit.ts on /bookstore.v1.* and /api/ai/chat:
+  // 60 attempts per minute per client IP, then HTTP 429.
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
+
   // The React build (see "build" in package.json). The Worker runs first only
   // for API paths; every other request is answered from these static assets.
   "assets": {
@@ -69,6 +83,12 @@
     "DB_SSLMODE": "require",
     // The schema comes from supabase/migrations/, so the Go backend must not create tables itself.
     "DB_INIT_SCHEMA": "false",
+    // PBKDF2 iterations for password records (Route B P2). PROVISIONAL at
+    // the design's minimum defensible count: the 2026-11-05 staging
+    // benchmark found no count meeting the Free-plan CPU budget (design
+    // §5.4 stop-and-escalate — see DEPLOY.md). On Workers Paid, raise to
+    // "100000". The PASSWORD_PEPPER secret is set in the dashboard, never here.
+    "PBKDF2_ITERATIONS": "10000",
     "LLM_MODEL": "ollama/beam:cloud",
     "LLM_API_BASE": "https://ollama.com"
   }
