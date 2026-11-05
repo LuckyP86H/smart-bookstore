@@ -1,43 +1,25 @@
 // Edge entry point for the Cloudflare deployment.
 //
 //   browser ──▶ this Worker ──┬─▶ static assets (the React build)      [Workers Static Assets]
-//                             └─▶ Go backend container (ConnectRPC + /api/ai/*)
+//                             ├─▶ /bookstore.v1.*  ConnectRPC services, served by the
+//                             │    Worker itself via Hyperdrive        [Route B, P1]
+//                             └─▶ /api/* ──▶ Go backend container (AI routes until P4)
 //                                      │  http://AI_SERVICE_HOST  (intercepted below)
 //                                      ▼
 //                                 AI service container (FastAPI)       [never has a public URL]
 //
-// Postgres + pgvector lives in Supabase; both containers connect to it directly.
+// Postgres + pgvector lives in Supabase; the Worker reaches it through
+// Hyperdrive and the containers connect to it directly.
 // Responsibilities stay separate: Supabase = data, Cloudflare = hosting and routing.
 
 import { Container, ContainerProxy, getContainer } from "@cloudflare/containers";
+import { handleConnectRequest } from "./connect-app";
 import { hyperdriveProof } from "./dev/hyperdrive-proof";
+import type { Env } from "./env";
 
 // Required export: it runs the outbound-interception handlers defined below.
 export { ContainerProxy };
-
-export interface Env {
-  BACKEND: DurableObjectNamespace<BackendContainer>;
-  AI_SERVICE: DurableObjectNamespace<AiServiceContainer>;
-  ASSETS: Fetcher;
-
-  // Route B: connection-pooled access to Supabase Postgres (wrangler.jsonc).
-  HYPERDRIVE: Hyperdrive;
-
-  // Plain settings (wrangler.jsonc "vars")
-  DB_HOST: string;
-  DB_PORT: string;
-  DB_USER: string;
-  DB_NAME: string;
-  DB_SSLMODE: string;
-  DB_INIT_SCHEMA: string;
-  LLM_MODEL: string;
-  LLM_API_BASE: string;
-
-  // Secrets (Cloudflare dashboard → Settings → Variables and Secrets). Never commit these.
-  DB_PASSWORD: string;
-  OLLAMA_API_KEY: string;
-  GOOGLE_BOOKS_API_KEY?: string;
-}
+export type { Env };
 
 // The Go backend calls the AI service at this address. It is not a real host:
 // the backend container's outbound traffic to it is intercepted and handed to
@@ -131,9 +113,13 @@ export default {
       return hyperdriveProof(env);
     }
 
-    // wrangler.jsonc only runs this Worker first for these paths; everything
-    // else is served straight from the static assets.
-    if (pathname.startsWith("/bookstore.v1.") || pathname.startsWith("/api/")) {
+    // Route B P1: the ConnectRPC services are served by the Worker itself
+    // (connect-app.ts) against Hyperdrive. /api/* still goes to the backend
+    // container until P4 ports the AI routes.
+    if (pathname.startsWith("/bookstore.v1.")) {
+      return handleConnectRequest(request, env);
+    }
+    if (pathname.startsWith("/api/")) {
       return getContainer(env.BACKEND).fetch(request);
     }
     return env.ASSETS.fetch(request);
