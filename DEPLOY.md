@@ -170,15 +170,33 @@ measurement caveats are in the P2 report in the Route B working notes.
 
 **Outcome: design §5.4's third outcome — stop-and-escalate.** No tested
 count meets the p95 ≤ 7 ms rule, so no count is certified for the Free
-plan by the design's gate. `PBKDF2_ITERATIONS` is provisionally set to
-**10,000** (the design's minimum defensible count) in `wrangler.jsonc`
-and in the code default, pending the owner's decision:
+plan by the design's gate. `PBKDF2_ITERATIONS` is set to **10,000**
+(the design's minimum defensible count) in `wrangler.jsonc` and in the
+code default.
 
-- **Workers Paid ($5/mo)** removes the question: the CPU limit becomes
-  30 s, and `PBKDF2_ITERATIONS` should be raised to `100000`.
-- **Staying on Free at 10,000** is the provisional posture: the pepper
-  and the login rate limiter become the load-bearing controls (design
-  §5.4 outcome (b)), and login-error rates need watching after deploy.
+**Owner decision, 2026-11-05: 10,000 is final on Free (option B —
+stay on Workers Free).** The owner declined both alternatives the
+benchmark framed: Workers Paid ($5/mo), and running 100,000 on Free
+while relying on the unenforced CPU limit documented below. A
+same-day re-benchmark (same staging method, same account) closed the
+remaining question — whether a *lower* count could meet the gate:
+
+| Iterations | Login CPU p50 | Login CPU p95 | Login CPU p99 | Verdict vs p95 ≤ 7 ms |
+|---|---|---|---|---|
+| 1,000 | 4.78 ms | 20.6 ms | 26.0 ms | fail |
+| 5,000 | 4.55 ms | 21.7 ms | 33.5 ms | fail |
+
+The p95 is flat across the low end (1k / 5k / 10k ≈ 20.6 / 21.7 /
+19.9 ms): the login path's tail cost is fixed Worker/Connect
+overhead, not the derivation (pure derivation scales from ≈2.0 ms at
+10,000 to ≈1.0 ms at 5,000 and ≈0.2 ms at 1,000). Lowering the count
+therefore buys ~0 ms at p95 and only weakens the hash — so 10,000
+stands. The ≤ 7 ms gate remains unmet on Free; that is an accepted,
+documented trade-off, with the pepper and the 60/min/IP login rate
+limiter as the compensating controls (design §5.4 outcome (b)), and
+login-error rates need watching after deploy. If the project ever
+moves to Workers Paid, the question disappears: the CPU limit becomes
+30 s, and `PBKDF2_ITERATIONS` flips to `100000` with no code change.
 
 Two measured facts frame that decision. First, the feared failure mode
 did **not** occur: zero `exceededCpu` outcomes and zero errors at every
@@ -187,8 +205,7 @@ the documented 10 ms Free CPU limit was not observed to be enforced on
 this account on 2026-11-05. Second, that leniency is not a guarantee:
 if Cloudflare enforces the documented limit, logins costing more than
 ~10 ms CPU would start failing, which is why the count stays at the
-floor until the owner decides. Do not raise it on Free without
-re-running this benchmark. (The staging batches also confirmed
+floor. Do not raise it on Free without re-running this benchmark. (The staging batches also confirmed
 wrong-password and unknown-user responses are indistinguishable —
 identical 401 status and body; the §10.5 statistical wall-time check
 could not be resolved from the test VM because its egress rotates

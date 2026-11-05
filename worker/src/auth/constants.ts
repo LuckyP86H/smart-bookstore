@@ -15,18 +15,24 @@ export const PEPPER_VERSION = 1;
 /**
  * Fallback iteration count when the PBKDF2_ITERATIONS env var is unset.
  *
- * PROVISIONAL — set by the staging benchmark (design §5) run 2026-11-05;
- * the full report is in DEPLOY.md ("Route B P2" section). The result was
- * §5.4's stop-and-escalate outcome: on this Free account the login path's
- * metered CPU p95 exceeded the 7 ms planning budget at EVERY tested count
- * (10k ≈ 19.9 ms; 25k ≈ 29.1 ms; 50k ≈ 38.7 ms; 100k ≈ 50–53 ms — with
+ * SETTLED 2026-11-05 — the owner decided (option B: stay on Workers
+ * Free); 10,000 is the final count on Free. The staging benchmarks
+ * (design §5) behind the decision are in DEPLOY.md ("Route B P2"
+ * section). Their result was §5.4's stop-and-escalate outcome: on this
+ * Free account the login path's metered CPU p95 exceeded the 7 ms
+ * planning budget at EVERY tested count — 1k ≈ 20.6 ms; 5k ≈ 21.7 ms;
+ * 10k ≈ 19.9 ms; 25k ≈ 29.1 ms; 50k ≈ 38.7 ms; 100k ≈ 50–53 ms — with
  * zero exceededCpu and zero errors anywhere, so the documented 10 ms
- * Free CPU limit was not observed to be enforced). 10,000 is the
- * design's minimum defensible count, so it is the provisional default
- * until the owner decides the Workers Paid question the benchmark
- * reopens: on Paid (30 s CPU) the count should go straight to 100,000
- * via the PBKDF2_ITERATIONS var, no code change needed. Do not raise
- * this default on Free without re-running the benchmark.
+ * Free CPU limit was not observed to be enforced. The p95 is flat at
+ * the low end because the tail is fixed Worker/Connect overhead, not
+ * the derivation, so lowering the count buys ~0 ms at p95 and only
+ * weakens the hash: 10,000 — the design's minimum defensible count —
+ * stands, and the unmet 7 ms gate is an accepted, documented
+ * trade-off with the pepper and the login rate limiter as the
+ * compensating controls. On Workers Paid (30 s CPU) the count should
+ * go straight to 100,000 via the PBKDF2_ITERATIONS var, no code change
+ * needed. Do not raise this default on Free without re-running the
+ * benchmark.
  */
 export const DEFAULT_PBKDF2_ITERATIONS = 10_000;
 

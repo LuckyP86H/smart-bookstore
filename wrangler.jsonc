@@ -83,11 +83,14 @@
     "DB_SSLMODE": "require",
     // The schema comes from supabase/migrations/, so the Go backend must not create tables itself.
     "DB_INIT_SCHEMA": "false",
-    // PBKDF2 iterations for password records (Route B P2). PROVISIONAL at
-    // the design's minimum defensible count: the 2026-11-05 staging
-    // benchmark found no count meeting the Free-plan CPU budget (design
-    // §5.4 stop-and-escalate — see DEPLOY.md). On Workers Paid, raise to
-    // "100000". The PASSWORD_PEPPER secret is set in the dashboard, never here.
+    // PBKDF2 iterations for password records (Route B P2). Settled
+    // 2026-11-05 at the design's minimum defensible count (owner
+    // decision, option B: stay on Free): the 2026-11-05 staging
+    // benchmarks found no count — 1k through 100k — meeting the
+    // Free-plan CPU budget at p95, and lowering buys ~0 ms at p95
+    // (design §5.4 stop-and-escalate — see DEPLOY.md), so 10000 is
+    // final on Free. On Workers Paid, raise to "100000". The
+    // PASSWORD_PEPPER secret is set in the dashboard, never here.
     "PBKDF2_ITERATIONS": "10000",
     "LLM_MODEL": "ollama/beam:cloud",
     "LLM_API_BASE": "https://ollama.com"
