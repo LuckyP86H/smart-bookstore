@@ -10,6 +10,7 @@
 // Responsibilities stay separate: Supabase = data, Cloudflare = hosting and routing.
 
 import { Container, ContainerProxy, getContainer } from "@cloudflare/containers";
+import { hyperdriveProof } from "./dev/hyperdrive-proof";
 
 // Required export: it runs the outbound-interception handlers defined below.
 export { ContainerProxy };
@@ -18,6 +19,9 @@ export interface Env {
   BACKEND: DurableObjectNamespace<BackendContainer>;
   AI_SERVICE: DurableObjectNamespace<AiServiceContainer>;
   ASSETS: Fetcher;
+
+  // Route B: connection-pooled access to Supabase Postgres (wrangler.jsonc).
+  HYPERDRIVE: Hyperdrive;
 
   // Plain settings (wrangler.jsonc "vars")
   DB_HOST: string;
@@ -119,6 +123,13 @@ export class AiServiceContainer extends Container<Env> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
+
+    // DEV-ONLY (Route B P0): connectivity proof through the Hyperdrive
+    // binding. Must be removed or gated before production — see
+    // worker/src/dev/hyperdrive-proof.ts.
+    if (pathname === "/api/dev/hyperdrive-proof") {
+      return hyperdriveProof(env);
+    }
 
     // wrangler.jsonc only runs this Worker first for these paths; everything
     // else is served straight from the static assets.
