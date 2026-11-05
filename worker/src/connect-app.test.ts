@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createTestDoubleCredentialChecker } from "./auth/test-double";
 import { serveConnectRequest } from "./connect-app";
 import type { QueryRunner } from "./db/client";
 import type { Env } from "./env";
@@ -34,7 +35,12 @@ async function call(
   request: Request,
   run: QueryRunner = emptyRun,
 ): Promise<{ status: number; json: Record<string, unknown> }> {
-  const response = await serveConnectRequest(request, ENV, run);
+  // These suites exercise routing/roles with the fixture test double; the
+  // production PBKDF2 checker has its own suite (store-checker.test.ts)
+  // plus the end-to-end describe at the bottom of this file.
+  const response = await serveConnectRequest(request, ENV, run, {
+    checker: createTestDoubleCredentialChecker(),
+  });
   const text = await response.text();
   return {
     status: response.status,
@@ -186,5 +192,64 @@ describe("P1 scope guards", () => {
     expect(json.message).toBe(
       "invalid ISBN: expected 10 or 13 digits with a valid check digit",
     );
+  });
+});
+
+describe("auth interceptor (production PBKDF2 checker, P2)", () => {
+  const TEST_PEPPER = "connect-app-test-pepper";
+  const REAL_ENV = {
+    ...ENV,
+    PASSWORD_PEPPER: TEST_PEPPER,
+    PBKDF2_ITERATIONS: "1000",
+  } as Env;
+
+  async function fixtureRun(): Promise<QueryRunner> {
+    const { hashPassword } = await import("./auth/password");
+    const record = await hashPassword("password1", {
+      iterations: 1000,
+      currentPepperVersion: 1,
+      pepperSecrets: new Map([[1, TEST_PEPPER]]),
+    });
+    return async (text, values) => {
+      if (text.includes("FROM stores WHERE username")) {
+        if (values[0] !== "merchant1") return [];
+        const row: Record<string, unknown> = { id: 1n, is_customer: false };
+        row["password"] = record;
+        return [row];
+      }
+      return text.includes("COUNT(*)") ? [{ total: 0 }] : [];
+    };
+  }
+
+  async function rawCall(
+    request: Request,
+    run: QueryRunner,
+  ): Promise<{ status: number; text: string }> {
+    const response = await serveConnectRequest(request, REAL_ENV, run);
+    return { status: response.status, text: await response.text() };
+  }
+
+  it("authenticates a real PBKDF2 record through the default wiring", async () => {
+    const run = await fixtureRun();
+    const { status } = await rawCall(
+      rpc("CustomerService", "GetAvailableBooks", {}, MERCHANT),
+      run,
+    );
+    expect(status).toBe(200);
+  });
+
+  it("wrong password and unknown user are byte-identical failures", async () => {
+    const run = await fixtureRun();
+    const wrong = await rawCall(
+      rpc("CustomerService", "GetAvailableBooks", {}, ["merchant1", "nope"]),
+      run,
+    );
+    const unknown = await rawCall(
+      rpc("CustomerService", "GetAvailableBooks", {}, ["ghost", "password1"]),
+      run,
+    );
+    expect(wrong.status).toBe(401);
+    expect(unknown.status).toBe(401);
+    expect(unknown.text).toBe(wrong.text);
   });
 });

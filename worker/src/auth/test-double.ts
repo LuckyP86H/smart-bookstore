@@ -1,30 +1,19 @@
-// P1 TEST DOUBLE — not production credential checking.
+// TEST DOUBLE — not production credential checking.
 //
-// Route B P1 exercises the auth interceptor's routing and role logic
-// (public ISBN lookup, customer → MerchantService denial) without touching
-// password cryptography: real verification is PBKDF2 against the `stores`
-// table and lands in P2 (see PBKDF2-DESIGN.md and ROUTE-B-PLAN §5 P2).
+// Route B P1 exercised the auth interceptor's routing and role logic
+// (public ISBN lookup, customer → MerchantService denial) with this double;
+// P2 landed real PBKDF2 verification against the `stores` table in
+// store-checker.ts, which is what connect-app.ts wires by default. This
+// double remains for the interceptor routing tests only.
 //
-// This double checks plaintext passwords against the three documented seed
+// It checks plaintext passwords against the three documented seed
 // accounts only (backend/db/database.go seedAccounts). The store ids match
 // the order the Go seeder inserts them. It must never learn any other
-// credential, and P2 replaces it wholesale — the interceptor in basic.ts
-// depends only on the CredentialChecker interface below.
+// credential.
 
-export interface AuthIdentity {
-  storeId: bigint;
-  isCustomer: boolean;
-  username: string;
-}
+import type { AuthIdentity, CredentialChecker } from "./basic";
 
-/**
- * Resolves a username/password pair to an identity, or null when the pair
- * does not authenticate. Implementations must make "unknown user" and
- * "wrong password" indistinguishable to the caller.
- */
-export interface CredentialChecker {
-  authenticate(username: string, password: string): Promise<AuthIdentity | null>;
-}
+export type { AuthIdentity, CredentialChecker };
 
 const FIXTURE_ACCOUNTS: readonly {
   username: string;

@@ -15,7 +15,24 @@ import {
   type Interceptor,
 } from "@connectrpc/connect";
 
-import type { AuthIdentity, CredentialChecker } from "./test-double";
+/** The identity an established credential resolves to. */
+export interface AuthIdentity {
+  storeId: bigint;
+  isCustomer: boolean;
+  username: string;
+}
+
+/**
+ * Resolves a username/password pair to an identity, or null when the pair
+ * does not authenticate. Implementations must make "unknown user" and
+ * "wrong password" indistinguishable to the caller, and must run exactly
+ * one password verification per call (PBKDF2-DESIGN.md §7). Production
+ * uses the PBKDF2 checker in store-checker.ts; test-double.ts holds the
+ * fixture double the routing tests use.
+ */
+export interface CredentialChecker {
+  authenticate(username: string, password: string): Promise<AuthIdentity | null>;
+}
 
 /** Procedures that skip authentication entirely (mirrors Go's publicProcedures). */
 const PUBLIC_PROCEDURES: ReadonlySet<string> = new Set([

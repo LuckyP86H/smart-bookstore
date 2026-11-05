@@ -13,6 +13,10 @@ export interface Env {
   // Route B: connection-pooled access to Supabase Postgres (wrangler.jsonc).
   HYPERDRIVE: Hyperdrive;
 
+  // Route B P2: login rate limiting binding (wrangler.jsonc "ratelimits").
+  // Optional so local tests without the binding still typecheck and run.
+  LOGIN_RATE_LIMITER?: RateLimit;
+
   // Plain settings (wrangler.jsonc "vars")
   DB_HOST: string;
   DB_PORT: string;
@@ -23,8 +27,16 @@ export interface Env {
   LLM_MODEL: string;
   LLM_API_BASE: string;
 
+  // Optional plain setting (wrangler.jsonc "vars"): PBKDF2 iteration target.
+  // Resolved and clamped by auth/constants.ts; unset means the default there.
+  PBKDF2_ITERATIONS?: string;
+
   // Secrets (Cloudflare dashboard → Settings → Variables and Secrets). Never commit these.
   DB_PASSWORD: string;
   OLLAMA_API_KEY: string;
   GOOGLE_BOOKS_API_KEY?: string;
+  // Route B P2: password pepper (PBKDF2-DESIGN.md §6), current version.
+  // Previous versions stay available as PASSWORD_PEPPER_V<n> during a
+  // rotation window; auth/store-checker.ts picks both forms up.
+  PASSWORD_PEPPER?: string;
 }

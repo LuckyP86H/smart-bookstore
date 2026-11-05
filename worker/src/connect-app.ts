@@ -15,13 +15,30 @@ import type {
   UniversalServerResponse,
 } from "@connectrpc/connect/protocol";
 
-import { createAuthInterceptor } from "./auth/basic";
-import { createTestDoubleCredentialChecker } from "./auth/test-double";
+import {
+  createAuthInterceptor,
+  type CredentialChecker,
+} from "./auth/basic";
+import {
+  createStoreCredentialChecker,
+  passwordPolicyFromEnv,
+} from "./auth/store-checker";
 import { createDb, type QueryRunner } from "./db/client";
 import type { Env } from "./env";
 import { CustomerService, MerchantService } from "./gen/bookstore_pb";
 import { createCustomerService } from "./services/customer";
 import { createMerchantService } from "./services/merchant";
+
+export interface ServeConnectOptions {
+  /**
+   * Credential checker to authenticate with. Defaults to the production
+   * PBKDF2 checker (auth/store-checker.ts) over the given query runner;
+   * tests inject the fixture double or a fixture-backed real checker.
+   */
+  checker?: CredentialChecker;
+  /** ctx.waitUntil, forwarded to the default checker for lazy rehash. */
+  waitUntil?: (promise: Promise<unknown>) => void;
+}
 
 /**
  * Serves one Connect request against an explicit query runner (the seam
@@ -31,9 +48,17 @@ export async function serveConnectRequest(
   request: Request,
   env: Env,
   run: QueryRunner,
+  options: ServeConnectOptions = {},
 ): Promise<Response> {
+  const checker =
+    options.checker ??
+    createStoreCredentialChecker({
+      run,
+      policy: passwordPolicyFromEnv(env),
+      waitUntil: options.waitUntil,
+    });
   const router = createConnectRouter({
-    interceptors: [createAuthInterceptor(createTestDoubleCredentialChecker())],
+    interceptors: [createAuthInterceptor(checker)],
   });
   router.service(
     MerchantService,
@@ -63,10 +88,14 @@ export async function serveConnectRequest(
 export async function handleConnectRequest(
   request: Request,
   env: Env,
+  ctx?: ExecutionContext,
 ): Promise<Response> {
   const db = createDb(env);
   try {
-    return await serveConnectRequest(request, env, db.run);
+    return await serveConnectRequest(request, env, db.run, {
+      waitUntil:
+        ctx !== undefined ? (promise) => ctx.waitUntil(promise) : undefined,
+    });
   } finally {
     await db.close().catch(() => undefined);
   }

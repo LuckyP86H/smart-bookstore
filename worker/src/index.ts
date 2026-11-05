@@ -13,6 +13,7 @@
 // Responsibilities stay separate: Supabase = data, Cloudflare = hosting and routing.
 
 import { Container, ContainerProxy, getContainer } from "@cloudflare/containers";
+import { checkLoginRateLimit } from "./auth/rate-limit";
 import { handleConnectRequest } from "./connect-app";
 import { hyperdriveProof } from "./dev/hyperdrive-proof";
 import type { Env } from "./env";
@@ -103,7 +104,11 @@ export class AiServiceContainer extends Container<Env> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const { pathname } = new URL(request.url);
 
     // DEV-ONLY (Route B P0): connectivity proof through the Hyperdrive
@@ -113,11 +118,18 @@ export default {
       return hyperdriveProof(env);
     }
 
+    // Route B P2: rate-limit the login-bearing routes (every Connect RPC
+    // carries Basic auth; /api/ai/chat too) before any credential work.
+    const rateLimited = await checkLoginRateLimit(request, env);
+    if (rateLimited !== null) {
+      return rateLimited;
+    }
+
     // Route B P1: the ConnectRPC services are served by the Worker itself
     // (connect-app.ts) against Hyperdrive. /api/* still goes to the backend
     // container until P4 ports the AI routes.
     if (pathname.startsWith("/bookstore.v1.")) {
-      return handleConnectRequest(request, env);
+      return handleConnectRequest(request, env, ctx);
     }
     if (pathname.startsWith("/api/")) {
       return getContainer(env.BACKEND).fetch(request);
