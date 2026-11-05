@@ -63,3 +63,4 @@ coverage/
 node_modules/
 .wrangler/
 .dev.vars
+scripts/.seed-cloud.bundle.mjs
