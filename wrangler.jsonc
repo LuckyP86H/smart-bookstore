@@ -3,7 +3,20 @@
   "name": "smart-bookstore",
   "main": "worker/src/index.ts",
   "compatibility_date": "2026-10-25",
+  // nodejs_compat is required by the postgres.js driver used through Hyperdrive.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+
+  // Route B: the Worker reaches Supabase Postgres through Hyperdrive
+  // (connection pooling). The origin credentials live inside the Hyperdrive
+  // config itself, never in this file. Config name: smart-bookstore
+  // (origin: Supabase session pooler, aws-1-ca-central-1, db "postgres").
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "29bdf1a02ce74d38816db8ff825cc4cd"
+    }
+  ],
 
   // The React build (see "build" in package.json). The Worker runs first only
   // for API paths; every other request is answered from these static assets.
@@ -49,7 +62,7 @@
   // Secrets are NOT here; set DB_PASSWORD and OLLAMA_API_KEY in the Cloudflare
   // dashboard (Settings → Variables and Secrets), see DEPLOY.md.
   "vars": {
-    "DB_HOST": "aws-0-ca-central-1.pooler.supabase.com",
+    "DB_HOST": "aws-1-ca-central-1.pooler.supabase.com",
     "DB_PORT": "5432",
     "DB_USER": "postgres.lakylendodavkbagffqc",
     "DB_NAME": "postgres",
