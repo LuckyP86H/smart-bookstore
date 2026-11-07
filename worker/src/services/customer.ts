@@ -1,27 +1,30 @@
-// CustomerService implementation (Route B P1: reads only).
-// Port of backend/services/customer_service.go. The write RPCs
-// (PurchaseBook, CheckoutCart, AddReview) are P3 scope; they are
-// intentionally omitted here, and the Connect router answers them with
-// CodeUnimplemented, as ROUTE-B-PLAN §5 P1 specifies.
+// CustomerService implementation (reads: Route B P1; writes: P3).
+// Port of backend/services/customer_service.go.
 
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ServiceImpl } from "@connectrpc/connect";
 
 import { requireIdentity } from "../auth/basic";
-import type { QueryRunner } from "../db/client";
+import type { QueryRunner, TransactionRunner } from "../db/client";
 import {
+  addReview,
+  checkoutCart,
   getAvailableBooks,
   getBookById,
   getBookReviews,
   getPurchaseHistory,
+  purchaseBook,
 } from "../db/queries";
 import {
+  AddReviewResponseSchema,
+  CheckoutCartResponseSchema,
   CustomerService,
   Genre,
   GetAvailableBooksResponseSchema,
   GetBookDetailsResponseSchema,
   GetBookReviewsResponseSchema,
   GetPurchaseHistoryResponseSchema,
+  PurchaseBookResponseSchema,
   SortOrder,
 } from "../gen/bookstore_pb";
 
@@ -40,9 +43,73 @@ function enumName(table: Record<number, string>, value: number): string {
 
 export function createCustomerService(
   run: QueryRunner,
+  begin: TransactionRunner,
 ): Partial<ServiceImpl<typeof CustomerService>> {
   return {
-    // purchaseBook, checkoutCart, addReview: P3 (router answers Unimplemented).
+    async purchaseBook(req, ctx) {
+      const identity = requireIdentity(ctx);
+      // Go normalises a non-positive quantity to 1 rather than erroring.
+      const quantity = req.quantity <= 0 ? 1 : req.quantity;
+      try {
+        const sale = await purchaseBook(
+          run,
+          begin,
+          req.bookId,
+          identity.storeId,
+          quantity,
+        );
+        return create(PurchaseBookResponseSchema, {
+          message: `Successfully purchased ${quantity} copy(ies)`,
+          sale,
+        });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
+
+    async checkoutCart(req, ctx) {
+      const identity = requireIdentity(ctx);
+      if (req.items.length === 0) {
+        throw new ConnectError("cart is empty", Code.InvalidArgument);
+      }
+      // Same per-item quantity normalisation as PurchaseBook (Go).
+      const items = req.items.map((item) => ({
+        bookId: item.bookId,
+        quantity: item.quantity <= 0 ? 1 : item.quantity,
+      }));
+      try {
+        const sales = await checkoutCart(begin, identity.storeId, items);
+        return create(CheckoutCartResponseSchema, {
+          message: `Successfully checked out ${sales.length} item(s)`,
+          sales,
+        });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
+
+    async addReview(req, ctx) {
+      const identity = requireIdentity(ctx);
+      // Go validates the rating before touching the database.
+      if (req.rating < 1 || req.rating > 5) {
+        throw new ConnectError(
+          "rating must be between 1 and 5",
+          Code.InvalidArgument,
+        );
+      }
+      try {
+        const review = await addReview(
+          run,
+          req.bookId,
+          identity.storeId,
+          req.rating,
+          req.reviewText,
+        );
+        return create(AddReviewResponseSchema, { review });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
 
     async getAvailableBooks(req) {
       // The Go service lowercases the free-text filters before the query

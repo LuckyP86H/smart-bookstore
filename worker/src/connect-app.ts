@@ -23,7 +23,11 @@ import {
   createStoreCredentialChecker,
   passwordPolicyFromEnv,
 } from "./auth/store-checker";
-import { createDb, type QueryRunner } from "./db/client";
+import {
+  createDb,
+  type QueryRunner,
+  type TransactionRunner,
+} from "./db/client";
 import type { Env } from "./env";
 import { CustomerService, MerchantService } from "./gen/bookstore_pb";
 import { createCustomerService } from "./services/customer";
@@ -38,7 +42,21 @@ export interface ServeConnectOptions {
   checker?: CredentialChecker;
   /** ctx.waitUntil, forwarded to the default checker for lazy rehash. */
   waitUntil?: (promise: Promise<unknown>) => void;
+  /**
+   * Transaction runner for the purchase paths (P3). handleConnectRequest
+   * supplies the real Hyperdrive-backed one; tests inject a fake. When
+   * omitted, PurchaseBook / CheckoutCart fail loudly (CodeInternal)
+   * rather than ever running outside a transaction.
+   */
+  begin?: TransactionRunner;
 }
+
+/** The begin used when no transaction runner was wired: always fails. */
+const unavailableBegin: TransactionRunner = async () => {
+  throw new Error(
+    "database transactions are not available in this serving context",
+  );
+};
 
 /**
  * Serves one Connect request against an explicit query runner (the seam
@@ -64,7 +82,10 @@ export async function serveConnectRequest(
     MerchantService,
     createMerchantService(run, env.GOOGLE_BOOKS_API_KEY),
   );
-  router.service(CustomerService, createCustomerService(run));
+  router.service(
+    CustomerService,
+    createCustomerService(run, options.begin ?? unavailableBegin),
+  );
 
   const { pathname } = new URL(request.url);
   const handler = router.handlers.find((h) => h.requestPath === pathname);
@@ -95,6 +116,7 @@ export async function handleConnectRequest(
     return await serveConnectRequest(request, env, db.run, {
       waitUntil:
         ctx !== undefined ? (promise) => ctx.waitUntil(promise) : undefined,
+      begin: db.begin,
     });
   } finally {
     await db.close().catch(() => undefined);

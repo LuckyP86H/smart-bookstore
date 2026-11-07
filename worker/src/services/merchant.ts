@@ -1,8 +1,5 @@
-// MerchantService implementation (Route B P1: reads only).
-// Port of backend/services/merchant_service.go. The write RPCs
-// (AddBook, RemoveBook, UpdateStock) are P3 scope; they are intentionally
-// omitted here, and the Connect router answers them with
-// CodeUnimplemented, as ROUTE-B-PLAN §5 P1 specifies.
+// MerchantService implementation (reads: Route B P1; writes: P3).
+// Port of backend/services/merchant_service.go.
 
 import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ServiceImpl } from "@connectrpc/connect";
@@ -10,9 +7,12 @@ import { Code, ConnectError, type ServiceImpl } from "@connectrpc/connect";
 import { requireIdentity } from "../auth/basic";
 import type { QueryRunner } from "../db/client";
 import {
+  createBook,
+  deleteBook,
   getLowStockBooks,
   getMerchantBooks,
   getSoldBooks,
+  updateStock,
 } from "../db/queries";
 import {
   BookNotFoundError,
@@ -20,12 +20,21 @@ import {
 } from "../external/google-books";
 import { InvalidISBNError, normalizeISBN } from "../external/isbn";
 import {
+  AddBookResponseSchema,
+  Genre,
   GetLowStockBooksResponseSchema,
   GetMerchantBooksResponseSchema,
   GetSoldBooksResponseSchema,
   LookupBookByISBNResponseSchema,
   MerchantService,
+  RemoveBookResponseSchema,
+  UpdateStockResponseSchema,
 } from "../gen/bookstore_pb";
+
+/** Enum value → proto name ("FICTION"), as Go's Enum.String() produces. */
+function enumName(table: Record<number, string>, value: number): string {
+  return table[value] ?? "";
+}
 
 /** Mirrors Go's db-error mapping in the merchant service: CodeInternal. */
 function internal(err: unknown): ConnectError {
@@ -75,7 +84,55 @@ export function createMerchantService(
   googleBooksApiKey: string | undefined,
 ): Partial<ServiceImpl<typeof MerchantService>> {
   return {
-    // addBook, removeBook, updateStock: P3 (router answers Unimplemented).
+    async addBook(req, ctx) {
+      const identity = requireIdentity(ctx);
+      try {
+        const book = await createBook(run, identity.storeId, {
+          isbn: req.isbn,
+          title: req.title,
+          author: req.author,
+          genre: enumName(Genre, req.genre),
+          publisher: req.publisher,
+          publicationYear: req.publicationYear,
+          pageCount: req.pageCount,
+          language: req.language,
+          coverImageUrl: req.coverImageUrl,
+          description: req.description,
+          price: req.price,
+          stockQuantity: req.stockQuantity,
+        });
+        return create(AddBookResponseSchema, { book });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
+
+    async removeBook(req, ctx) {
+      const identity = requireIdentity(ctx);
+      try {
+        await deleteBook(run, req.bookId, identity.storeId);
+        return create(RemoveBookResponseSchema, {
+          message: "Book successfully removed",
+        });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
+
+    async updateStock(req, ctx) {
+      const identity = requireIdentity(ctx);
+      try {
+        const book = await updateStock(
+          run,
+          req.bookId,
+          identity.storeId,
+          req.quantityToAdd,
+        );
+        return create(UpdateStockResponseSchema, { book });
+      } catch (err) {
+        throw internal(err);
+      }
+    },
 
     async getMerchantBooks(req, ctx) {
       const identity = requireIdentity(ctx);
