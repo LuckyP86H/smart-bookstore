@@ -12,6 +12,20 @@
 //       (docker compose) as --a and a Worker preview as --b, with the SAME
 //       seed dataset loaded into both databases.
 //
+//   --only <substring>[,<substring>...] restricts the run to cases whose
+//   name contains one of the substrings (e.g. --only writes/ runs the
+//   non-mutating write cases). Write cases come in two groups:
+//     writes/          — denials, validation and not-found paths. These
+//                        never change data and are safe against any
+//                        target, seeded or empty.
+//     writes-mutating/ — the happy-path sequence (P3). Run ONLY against
+//                        scratch databases (diff mode with the same seed
+//                        on both sides), in file order: later cases
+//                        depend on earlier ones. Expectation mode asserts
+//                        status + deterministic messages/shapes, never
+//                        ids or timestamps; in diff mode those volatile
+//                        fields can differ across the two databases.
+//
 // Credentials are the documented seed accounts (merchant1 / customer).
 // Exit code is non-zero when any expectation fails or any diff mismatches.
 //
@@ -66,8 +80,35 @@ const CASES = [
   { name: "isbn/hyphenated", service: "MerchantService", method: "LookupBookByISBN", body: { isbn: "978-0-441-17271-9" }, expect: { status: 200 } },
   { name: "isbn/bad-check-digit", service: "MerchantService", method: "LookupBookByISBN", body: { isbn: "9780441172718" }, expect: { status: 400, code: "invalid_argument" } },
   { name: "isbn/valid-but-nonexistent", service: "MerchantService", method: "LookupBookByISBN", body: { isbn: "9780000000002" }, expect: { status: 404, code: "not_found" } },
-  { name: "writes/add-book-unimplemented", service: "MerchantService", method: "AddBook", auth: "merchant", body: {}, expect: { status: 501, code: "unimplemented" } },
-  { name: "writes/purchase-unimplemented", service: "CustomerService", method: "PurchaseBook", auth: "customer", body: { bookId: "1", quantity: 1 }, expect: { status: 501, code: "unimplemented" } },
+  // ---- Write RPCs (P3): non-mutating surface ------------------------------
+  // Denials, validation order, and not-found mappings. None of these
+  // change data, so they are deterministic against any target state.
+  { name: "writes/add-book/customer-denied", service: "MerchantService", method: "AddBook", auth: "customer", body: { title: "X" }, expect: { status: 403, code: "permission_denied" } },
+  { name: "writes/add-book/no-auth", service: "MerchantService", method: "AddBook", body: { title: "X" }, expect: { status: 401, code: "unauthenticated" } },
+  { name: "writes/remove-book/customer-denied", service: "MerchantService", method: "RemoveBook", auth: "customer", body: { bookId: "1" }, expect: { status: 403, code: "permission_denied" } },
+  { name: "writes/remove-book/missing", service: "MerchantService", method: "RemoveBook", auth: "merchant", body: { bookId: "999999" }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "book not found or unauthorized" } },
+  { name: "writes/update-stock/customer-denied", service: "MerchantService", method: "UpdateStock", auth: "customer", body: { bookId: "1", quantityToAdd: 1 }, expect: { status: 403, code: "permission_denied" } },
+  { name: "writes/update-stock/missing", service: "MerchantService", method: "UpdateStock", auth: "merchant", body: { bookId: "999999", quantityToAdd: 1 }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "book not found or unauthorized" } },
+  { name: "writes/purchase/no-auth", service: "CustomerService", method: "PurchaseBook", body: { bookId: "1", quantity: 1 }, expect: { status: 401, code: "unauthenticated" } },
+  { name: "writes/purchase/missing-book", service: "CustomerService", method: "PurchaseBook", auth: "customer", body: { bookId: "999999", quantity: 1 }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "book not found" } },
+  { name: "writes/checkout/empty-cart", service: "CustomerService", method: "CheckoutCart", auth: "customer", body: { items: [] }, expect: { status: 400, code: "invalid_argument", jsonCheck: (j) => j.message === "cart is empty" } },
+  { name: "writes/checkout/missing-book", service: "CustomerService", method: "CheckoutCart", auth: "customer", body: { items: [{ bookId: "999999", quantity: 1 }] }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "book 999999 not found" } },
+  { name: "writes/add-review/no-auth", service: "CustomerService", method: "AddReview", body: { bookId: "1", rating: 5, reviewText: "x" }, expect: { status: 401, code: "unauthenticated" } },
+  { name: "writes/add-review/rating-too-high", service: "CustomerService", method: "AddReview", auth: "customer", body: { bookId: "1", rating: 6, reviewText: "x" }, expect: { status: 400, code: "invalid_argument", jsonCheck: (j) => j.message === "rating must be between 1 and 5" } },
+  { name: "writes/add-review/rating-zero", service: "CustomerService", method: "AddReview", auth: "customer", body: { bookId: "1", rating: 0, reviewText: "x" }, expect: { status: 400, code: "invalid_argument", jsonCheck: (j) => j.message === "rating must be between 1 and 5" } },
+  { name: "writes/add-review/not-purchased", service: "CustomerService", method: "AddReview", auth: "customer", body: { bookId: "999999", rating: 5, reviewText: "x" }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "you can only review books you have purchased" } },
+
+  // ---- Write RPCs (P3): mutating happy-path sequence ----------------------
+  // Scratch databases ONLY (see header). Order matters. Assumes the
+  // standard seed fixture (scripts/seed-data.sh) on both targets, so
+  // book id "1" is merchant1's "Clean Code" with ample stock.
+  { name: "writes-mutating/add-book/created", service: "MerchantService", method: "AddBook", auth: "merchant", body: { isbn: "9780000000019", title: "Parity Probe Book", author: "Harness", genre: "FICTION", price: 12.5, stockQuantity: 3 }, expect: { status: 200, jsonCheck: (j) => j.book?.title === "Parity Probe Book" && j.book?.storeName === "merchant1" } },
+  { name: "writes-mutating/update-stock/own-book", service: "MerchantService", method: "UpdateStock", auth: "merchant", body: { bookId: "1", quantityToAdd: 1 }, expect: { status: 200, jsonCheck: (j) => j.book?.id === "1" } },
+  { name: "writes-mutating/purchase/happy", service: "CustomerService", method: "PurchaseBook", auth: "customer", body: { bookId: "1", quantity: 1 }, expect: { status: 200, jsonCheck: (j) => j.message === "Successfully purchased 1 copy(ies)" && typeof j.sale?.bookTitle === "string" } },
+  { name: "writes-mutating/checkout/happy", service: "CustomerService", method: "CheckoutCart", auth: "customer", body: { items: [{ bookId: "1", quantity: 1 }] }, expect: { status: 200, jsonCheck: (j) => j.message === "Successfully checked out 1 item(s)" && Array.isArray(j.sales) && j.sales.length === 1 } },
+  { name: "writes-mutating/purchase/oversell", service: "CustomerService", method: "PurchaseBook", auth: "customer", body: { bookId: "1", quantity: 100000 }, expect: { status: 500, code: "internal", jsonCheck: (j) => typeof j.message === "string" && j.message.startsWith("insufficient stock: only ") } },
+  { name: "writes-mutating/add-review/after-purchase", service: "CustomerService", method: "AddReview", auth: "customer", body: { bookId: "1", rating: 5, reviewText: "Parity review" }, expect: { status: 200, jsonCheck: (j) => j.review?.customerName === "customer" && j.review?.rating === 5 } },
+  { name: "writes-mutating/remove-book/with-sales", service: "MerchantService", method: "RemoveBook", auth: "merchant", body: { bookId: "1" }, expect: { status: 500, code: "internal", jsonCheck: (j) => j.message === "cannot delete book with sales history" } },
 ];
 
 function canonical(value) {
@@ -114,12 +155,25 @@ async function main() {
   const baseA = args[args.indexOf("--a") + 1];
   const baseB = args.includes("--b") ? args[args.indexOf("--b") + 1] : null;
   if (!baseA) {
-    console.error("usage: parity-harness.mjs --a <base-url> [--b <base-url>]");
+    console.error(
+      "usage: parity-harness.mjs --a <base-url> [--b <base-url>] [--only <substring>[,...]]",
+    );
+    process.exit(2);
+  }
+  const only = args.includes("--only")
+    ? args[args.indexOf("--only") + 1].split(",")
+    : null;
+  const cases =
+    only === null
+      ? CASES
+      : CASES.filter((c) => only.some((token) => c.name.includes(token)));
+  if (cases.length === 0) {
+    console.error("--only matched no cases");
     process.exit(2);
   }
 
   let failures = 0;
-  for (const testCase of CASES) {
+  for (const testCase of cases) {
     const a = await fire(baseA.replace(/\/$/, ""), testCase);
     if (baseB) {
       const b = await fire(baseB.replace(/\/$/, ""), testCase);
@@ -154,7 +208,7 @@ async function main() {
   }
 
   console.log(
-    `\n${CASES.length} cases, ${failures} failure${failures === 1 ? "" : "s"}${baseB ? " (diff mode)" : " (expectation mode)"}`,
+    `\n${cases.length} cases, ${failures} failure${failures === 1 ? "" : "s"}${baseB ? " (diff mode)" : " (expectation mode)"}`,
   );
   process.exit(failures === 0 ? 0 : 1);
 }
