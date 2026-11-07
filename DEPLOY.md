@@ -220,3 +220,85 @@ full login flow (correct/wrong/unknown + lazy rehash of a
 1,000-iteration record up to the target) against a fixture checker on
 the staging deploy. The owner-seeded live login remains a post-seed
 check (run the seed script, then the "Check it works" curls above).
+
+## Route B P3 — write endpoints + purchase/checkout parity (2026-11-05)
+
+> Status: implemented on `feat/worker-native-route-b` (P3). All six write
+> RPCs are now served by the Worker; nothing under `/bookstore.v1.*`
+> answers Unimplemented any more. Behaviour mirrors the Go backend
+> (`backend/db/database.go` + the two service files) statement for
+> statement, including its quirks — the Go stack stays the local runtime,
+> so anything the Worker "improved" silently would be a parity break.
+
+### What was implemented, per RPC
+
+| RPC | Parity notes |
+|---|---|
+| `AddBook` | Upsert on `(store_id, isbn)`: re-adding an ISBN updates the row in place (id, `total_sold`, `average_rating`, `created_at` preserved). `store_name` filled by the same follow-up username lookup Go runs, its error ignored exactly as in Go. |
+| `RemoveBook` | Refuses books with any sales history (`cannot delete book with sales history`); ownership is a predicate in the DELETE itself, so a foreign or missing id both surface `book not found or unauthorized`. (TS reads the deleted ids via `RETURNING id` where Go reads `RowsAffected` — same count signal.) |
+| `UpdateStock` | Signed delta in one guarded UPDATE scoped to the caller's store; missing/foreign book → `book not found or unauthorized`. |
+| `PurchaseBook` | Real transaction (below): lock row `FOR UPDATE` → stock check → decrement + `total_sold` → sale insert. Quantity ≤ 0 normalises to 1 in the handler, as in Go. Errors: `book not found`, `insufficient stock: only N available`. |
+| `CheckoutCart` | The whole cart in ONE transaction, items in request order; any failure rolls back every item — partial checkouts never happen. Empty cart → `invalid_argument` "cart is empty" before any SQL. Errors name the item: `book <id> not found`, `insufficient stock for book '<title>': only N available`. |
+| `AddReview` | Rating validated (1–5) before any SQL (`invalid_argument`). Then the verified-purchase gate: no sale → `you can only review books you have purchased`. The insert is an **upsert** on `(book_id, customer_id)` — a second review updates the first (rating, text, `created_at`), it does not error. The book's `average_rating` refresh afterwards is fire-and-forget, its error discarded, exactly as in Go. No embedding is written on any write path (embeddings stay batch-only until P4, plan §2.3). |
+
+Error mapping, all six: handler-level validation keeps its codes
+(`invalid_argument`, plus the interceptor's `unauthenticated` /
+`permission_denied`); every database-layer failure surfaces as
+`internal` carrying the Go error message verbatim where Go constructs
+the message. Where Go instead propagates a raw driver error (e.g. a
+constraint failure inside `CreateBook`), the code still matches
+(`internal`) but the message text is the postgres.js driver's, not
+lib/pq's — driver text is not part of the contract the frontend uses.
+
+### Transactions
+
+`PurchaseBook` / `CheckoutCart` run in real postgres.js transactions
+(`sql.begin`) over Hyperdrive — the shape P0 proved through the session
+pooler, and the same shape as Go's `tx` blocks, `SELECT … FOR UPDATE`
+included, so the oversell guard is the row lock itself. If a serving
+context ever fails to wire the transaction runner, the purchase RPCs
+fail loudly with `internal` ("database transactions are not available
+in this serving context") instead of running non-atomically.
+
+### Verification (2026-11-05)
+
+- **Unit/integration (vitest, 123 tests, all green):** 23 new tests in
+  `worker/src/writes.test.ts` drive the real interceptor + services +
+  query layer against a stateful in-memory fake whose transactions are
+  serialised snapshot/rollback blocks: happy paths for all six RPCs,
+  Go's validation order (rating and empty-cart checks fire before any
+  SQL), role denials, every error message above, checkout rollback
+  (zero sales, stock untouched), the review upsert + average refresh,
+  and 10 parallel purchases of a stock-1 book yielding exactly 1 sale
+  and 9 clean `insufficient stock: only 0 available` failures.
+  Typecheck, root build (both protobuf gens regenerate byte-identical)
+  and frontend lint all exit 0; the iteration-literal guard is clean.
+- **Staging smoke (throwaway `smart-bookstore-hyperdrive-proof`):** the
+  real Worker code over the real Hyperdrive connection, with the
+  fixture test-double checker (the cloud `stores` table is still
+  unseeded, so the production checker has nothing to verify against).
+  The parity harness's 14 non-mutating write cases — denials,
+  validation, not-found, including the purchase/checkout paths opening
+  real transactions that roll back on the missing book — plus 3 read
+  cases: **all pass**. The proof endpoint read `books_count: 0` before
+  and after: zero writes reached the remote database. The throwaway
+  was restored to the P0 proof bundle afterwards (HTTP 200,
+  `select1: 1`).
+- **Not live-verified, deliberately:** every mutating happy path
+  (create/purchase/checkout/review against real rows) — rehearsing
+  writes on the live catalog is out of bounds, and the catalog is
+  empty and unseeded besides. Those paths are covered by the unit
+  suite above and by the harness's `writes-mutating/` case sequence,
+  which runs against scratch databases only.
+
+### Owner follow-ups
+
+1. After seeding the cloud accounts (P2 section above) and loading a
+   catalog, run the plan §6 smoke list items 6–8 (add → purchase →
+   oversell, checkout-with-impossible-item) against the preview.
+2. On a machine with Docker: load the same seed fixture into the
+   compose Postgres and a scratch Supabase-side database, then run the
+   parity harness in two-target diff mode with no `--only` filter —
+   that is the run that exercises `writes-mutating/` against both
+   implementations, including the P3 gate's real-Postgres concurrency
+   check (the unit suite models it; only a real database proves it).
