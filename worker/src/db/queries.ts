@@ -1,6 +1,7 @@
-// Port of the read queries in backend/db/database.go (the Go backend stays
+// Port of the queries in backend/db/database.go (the Go backend stays
 // the local runtime; this file is its query-for-query TypeScript mirror —
-// see ROUTE-B-PLAN §7). The Worker only ever runs DML, never DDL.
+// see ROUTE-B-PLAN §7). Reads landed in P1, writes in P3. The Worker only
+// ever runs DML, never DDL.
 //
 // SQL text, joins, filters, sort orders and pagination deliberately match
 // the Go originals, including their quirks (documented where they bite).
@@ -16,7 +17,12 @@ import {
   type Review,
   type Sale,
 } from "../gen/bookstore_pb";
-import type { QueryRow, QueryRunner, QueryValue } from "./client";
+import type {
+  QueryRow,
+  QueryRunner,
+  QueryValue,
+  TransactionRunner,
+} from "./client";
 
 // ---------------------------------------------------------------------------
 // Row mapping helpers
@@ -349,4 +355,350 @@ export async function getPurchaseHistory(
     [customerId],
   );
   return rows.map(saleFromRow);
+}
+
+// ---------------------------------------------------------------------------
+// Merchant writes (database.go: CreateBook, DeleteBook, UpdateStock)
+//
+// Go fills Book.store_name with a follow-up `SELECT username FROM stores`
+// whose error it deliberately ignores (the Scan result is unchecked), so
+// the helpers below do the same: a failed lookup leaves store_name "".
+// ---------------------------------------------------------------------------
+
+/** Column list shared by CreateBook's and UpdateStock's RETURNING clauses. */
+const BOOK_RETURNING = `
+		RETURNING id, store_id, isbn, title, author, genre, publisher, publication_year,
+			page_count, language, cover_image_url, description, price, stock_quantity,
+			total_sold, average_rating, created_at`;
+
+/**
+ * Looks up a store's username (the value every Book.store_name carries),
+ * swallowing any error exactly as the Go write paths do.
+ */
+async function storeNameLookup(
+  run: QueryRunner,
+  storeId: unknown,
+): Promise<string> {
+  try {
+    const rows = await run("SELECT username FROM stores WHERE id = $1", [
+      storeId as QueryValue,
+    ]);
+    return rows.length > 0 ? toText(rows[0].username) : "";
+  } catch {
+    return "";
+  }
+}
+
+export interface CreateBookInput {
+  isbn: string;
+  title: string;
+  author: string;
+  /** Proto enum name ("FICTION", …), as Go's Genre.String() produces. */
+  genre: string;
+  publisher: string;
+  publicationYear: number;
+  pageCount: number;
+  language: string;
+  coverImageUrl: string;
+  description: string;
+  price: number;
+  stockQuantity: number;
+}
+
+/**
+ * Upsert on (store_id, isbn): re-adding an ISBN the store already carries
+ * updates the row in place, preserving id, total_sold, average_rating and
+ * created_at (database.go CreateBook).
+ */
+export async function createBook(
+  run: QueryRunner,
+  storeId: bigint,
+  input: CreateBookInput,
+): Promise<Book> {
+  const rows = await run(
+    `
+		INSERT INTO books (store_id, isbn, title, author, genre, publisher, publication_year,
+			page_count, language, cover_image_url, description, price, stock_quantity)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		ON CONFLICT (store_id, isbn) DO UPDATE SET
+			title = EXCLUDED.title,
+			author = EXCLUDED.author,
+			genre = EXCLUDED.genre,
+			publisher = EXCLUDED.publisher,
+			publication_year = EXCLUDED.publication_year,
+			page_count = EXCLUDED.page_count,
+			language = EXCLUDED.language,
+			cover_image_url = EXCLUDED.cover_image_url,
+			description = EXCLUDED.description,
+			price = EXCLUDED.price,
+			stock_quantity = EXCLUDED.stock_quantity${BOOK_RETURNING}`,
+    [
+      storeId,
+      input.isbn,
+      input.title,
+      input.author,
+      input.genre,
+      input.publisher,
+      input.publicationYear,
+      input.pageCount,
+      input.language,
+      input.coverImageUrl,
+      input.description,
+      input.price,
+      input.stockQuantity,
+    ],
+  );
+  const row = rows[0];
+  const storeName = await storeNameLookup(run, row.store_id);
+  return bookFromRow({ ...row, store_name: storeName });
+}
+
+/**
+ * Deletes one of the caller's own books. A book with any sales history is
+ * undeletable, and the ownership predicate sits in the DELETE itself:
+ * another store's id deletes nothing and reports the same error as a
+ * missing book (database.go DeleteBook). Go reads RowsAffected from its
+ * Exec; the RETURNING id list gives the same count signal here.
+ */
+export async function deleteBook(
+  run: QueryRunner,
+  bookId: bigint,
+  storeId: bigint,
+): Promise<void> {
+  const existsRows = await run(
+    "SELECT EXISTS(SELECT 1 FROM sales WHERE book_id=$1) AS has_sales",
+    [bookId],
+  );
+  if (existsRows.length > 0 && existsRows[0].has_sales === true) {
+    throw new Error("cannot delete book with sales history");
+  }
+
+  const deleted = await run(
+    "DELETE FROM books WHERE id = $1 AND store_id = $2 RETURNING id",
+    [bookId, storeId],
+  );
+  if (deleted.length === 0) {
+    throw new Error("book not found or unauthorized");
+  }
+}
+
+/**
+ * Applies a signed stock delta to one of the caller's own books and
+ * returns the updated row (database.go UpdateStock). A book the caller
+ * does not own is indistinguishable from a missing one.
+ */
+export async function updateStock(
+  run: QueryRunner,
+  bookId: bigint,
+  storeId: bigint,
+  quantityToAdd: number,
+): Promise<Book> {
+  const rows = await run(
+    `
+		UPDATE books
+		SET stock_quantity = stock_quantity + $1
+		WHERE id = $2 AND store_id = $3${BOOK_RETURNING}`,
+    [quantityToAdd, bookId, storeId],
+  );
+  if (rows.length === 0) {
+    throw new Error("book not found or unauthorized");
+  }
+  const row = rows[0];
+  const storeName = await storeNameLookup(run, row.store_id);
+  return bookFromRow({ ...row, store_name: storeName });
+}
+
+// ---------------------------------------------------------------------------
+// Customer writes (database.go: PurchaseBook, CheckoutCart, AddReview)
+// ---------------------------------------------------------------------------
+
+/** The columns PurchaseBook / CheckoutCart lock and read per item. */
+const BOOK_FOR_UPDATE =
+  "SELECT stock_quantity, price, title FROM books WHERE id = $1 FOR UPDATE";
+
+const SALE_INSERT = `
+		INSERT INTO sales (book_id, customer_id, quantity, price_at_purchase)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, purchased_at`;
+
+/** Builds a Sale message from parts, the way database.go assembles db.Sale. */
+function saleFromParts(parts: {
+  id: unknown;
+  bookId: bigint;
+  bookTitle: string;
+  customerId: bigint;
+  customerName: string;
+  quantity: number;
+  priceAtPurchase: number;
+  purchasedAt: unknown;
+}): Sale {
+  return create(SaleSchema, {
+    id: toBigInt(parts.id),
+    bookId: parts.bookId,
+    bookTitle: parts.bookTitle,
+    customerId: parts.customerId,
+    customerName: parts.customerName,
+    quantity: parts.quantity,
+    priceAtPurchase: parts.priceAtPurchase,
+    purchasedAt: formatTimestamp(parts.purchasedAt),
+  });
+}
+
+/**
+ * Buys `quantity` copies of one book in a single transaction: lock the
+ * row (SELECT … FOR UPDATE), check stock, decrement + count the sale,
+ * insert the sale row — any failure rolls the whole thing back
+ * (database.go PurchaseBook). Mirroring Go, the customer-name lookup runs
+ * after the commit, on the caller's connection, with its error ignored.
+ */
+export async function purchaseBook(
+  run: QueryRunner,
+  begin: TransactionRunner,
+  bookId: bigint,
+  customerId: bigint,
+  quantity: number,
+): Promise<Sale> {
+  const bought = await begin(async (tx) => {
+    const rows = await tx(BOOK_FOR_UPDATE, [bookId]);
+    if (rows.length === 0) {
+      throw new Error("book not found");
+    }
+    const stock = toInt(rows[0].stock_quantity);
+    const price = toNumber(rows[0].price);
+    const title = toText(rows[0].title);
+    if (stock < quantity) {
+      throw new Error(`insufficient stock: only ${stock} available`);
+    }
+
+    await tx(
+      "UPDATE books SET stock_quantity = stock_quantity - $1, total_sold = total_sold + $1 WHERE id = $2",
+      [quantity, bookId],
+    );
+    const saleRows = await tx(SALE_INSERT, [bookId, customerId, quantity, price]);
+    return { saleRow: saleRows[0], price, title };
+  });
+
+  const customerName = await storeNameLookup(run, customerId);
+  return saleFromParts({
+    id: bought.saleRow.id,
+    bookId,
+    bookTitle: bought.title,
+    customerId,
+    customerName,
+    quantity,
+    priceAtPurchase: bought.price,
+    purchasedAt: bought.saleRow.purchased_at,
+  });
+}
+
+export interface CartItemInput {
+  bookId: bigint;
+  quantity: number;
+}
+
+/**
+ * The multi-item purchase, in ONE transaction: each item is locked,
+ * checked, decremented and recorded in request order, and any item
+ * failing rolls back every earlier item — partial checkouts never happen
+ * (database.go CheckoutCart). Mirroring Go, the customer-name lookup runs
+ * per item, inside the transaction, with its error ignored.
+ */
+export async function checkoutCart(
+  begin: TransactionRunner,
+  customerId: bigint,
+  items: CartItemInput[],
+): Promise<Sale[]> {
+  return begin(async (tx) => {
+    const sales: Sale[] = [];
+    for (const item of items) {
+      const rows = await tx(BOOK_FOR_UPDATE, [item.bookId]);
+      if (rows.length === 0) {
+        throw new Error(`book ${item.bookId} not found`);
+      }
+      const stock = toInt(rows[0].stock_quantity);
+      const price = toNumber(rows[0].price);
+      const title = toText(rows[0].title);
+      if (stock < item.quantity) {
+        throw new Error(
+          `insufficient stock for book '${title}': only ${stock} available`,
+        );
+      }
+
+      await tx(
+        "UPDATE books SET stock_quantity = stock_quantity - $1, total_sold = total_sold + $1 WHERE id = $2",
+        [item.quantity, item.bookId],
+      );
+      const saleRows = await tx(SALE_INSERT, [
+        item.bookId,
+        customerId,
+        item.quantity,
+        price,
+      ]);
+      const customerName = await storeNameLookup(tx, customerId);
+      sales.push(
+        saleFromParts({
+          id: saleRows[0].id,
+          bookId: item.bookId,
+          bookTitle: title,
+          customerId,
+          customerName,
+          quantity: item.quantity,
+          priceAtPurchase: price,
+          purchasedAt: saleRows[0].purchased_at,
+        }),
+      );
+    }
+    return sales;
+  });
+}
+
+/**
+ * Adds (or, on the (book_id, customer_id) conflict, updates) the caller's
+ * review of a book they have purchased, then refreshes the book's average
+ * rating (database.go AddReview). Not transactional in Go and not here:
+ * the rating refresh and the name lookup deliberately ignore their
+ * errors, exactly as the Go code discards them.
+ */
+export async function addReview(
+  run: QueryRunner,
+  bookId: bigint,
+  customerId: bigint,
+  rating: number,
+  reviewText: string,
+): Promise<Review> {
+  const purchasedRows = await run(
+    "SELECT EXISTS(SELECT 1 FROM sales WHERE book_id=$1 AND customer_id=$2) AS has_purchased",
+    [bookId, customerId],
+  );
+  if (purchasedRows.length === 0 || purchasedRows[0].has_purchased !== true) {
+    throw new Error("you can only review books you have purchased");
+  }
+
+  const rows = await run(
+    `
+		INSERT INTO reviews (book_id, customer_id, rating, review_text)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (book_id, customer_id)
+		DO UPDATE SET rating = $3, review_text = $4, created_at = NOW()
+		RETURNING id, book_id, customer_id, rating, review_text, created_at`,
+    [bookId, customerId, rating, reviewText],
+  );
+
+  // Fire-and-forget in Go (the Exec error is discarded); a failed refresh
+  // must not fail the review.
+  try {
+    await run(
+      `
+		UPDATE books
+		SET average_rating = (SELECT AVG(rating) FROM reviews WHERE book_id = $1)
+		WHERE id = $1`,
+      [bookId],
+    );
+  } catch {
+    // ignored, as in Go
+  }
+
+  const row = rows[0];
+  const customerName = await storeNameLookup(run, customerId);
+  return reviewFromRow({ ...row, customer_name: customerName });
 }

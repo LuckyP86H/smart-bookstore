@@ -21,8 +21,22 @@ export type QueryRow = Record<string, unknown>;
  */
 export type QueryRunner = (text: string, values: QueryValue[]) => Promise<QueryRow[]>;
 
+/**
+ * Runs `fn` inside a real database transaction (postgres.js `sql.begin`):
+ * the transaction commits when `fn` resolves and rolls back when it
+ * throws. The runner handed to `fn` is bound to the transaction's
+ * connection, so every statement it issues joins the transaction. P0
+ * proved BEGIN…COMMIT behaves through Hyperdrive + the session pooler;
+ * PurchaseBook / CheckoutCart (P3) are the consumers, mirroring the `tx`
+ * blocks in backend/db/database.go.
+ */
+export type TransactionRunner = <T>(
+  fn: (txRun: QueryRunner) => Promise<T>,
+) => Promise<T>;
+
 export interface Db {
   run: QueryRunner;
+  begin: TransactionRunner;
   close: () => Promise<void>;
 }
 
@@ -34,6 +48,13 @@ export function createDb(env: Env): Db {
   return {
     run: async (text, values) =>
       (await sql.unsafe(text, [...values])) as QueryRow[],
+    begin: async (fn) =>
+      sql.begin(async (tx) =>
+        fn(
+          async (text, values) =>
+            (await tx.unsafe(text, [...values])) as QueryRow[],
+        ),
+      ),
     close: () => sql.end({ timeout: 5 }),
   };
 }
