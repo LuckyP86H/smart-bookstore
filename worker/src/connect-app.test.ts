@@ -167,8 +167,51 @@ describe("read RPCs against an empty catalog", () => {
   });
 });
 
-describe("P1 scope guards", () => {
-  it("write RPCs answer unimplemented", async () => {
+describe("P3 scope guards", () => {
+  it("write RPCs are implemented (no longer unimplemented)", async () => {
+    // A minimal write-capable stub: just enough rows for each statement
+    // to complete or fail the way it would against an empty catalog.
+    // The full behavioural suite lives in writes.test.ts.
+    const bookRow = {
+      id: 1n,
+      store_id: 1n,
+      isbn: "",
+      title: "Stub",
+      author: "",
+      genre: "GENRE_UNSPECIFIED",
+      publisher: "",
+      publication_year: 0,
+      page_count: 0,
+      language: "",
+      cover_image_url: "",
+      description: "",
+      price: 1,
+      stock_quantity: 1,
+      total_sold: 0,
+      average_rating: 0,
+      created_at: new Date("2026-11-05T00:00:00Z"),
+    };
+    const writeRun: QueryRunner = async (text) => {
+      if (text.includes("INSERT INTO books")) return [bookRow];
+      if (text.includes("UPDATE books")) return [bookRow];
+      if (text.includes("DELETE FROM books")) return [{ id: 1n }];
+      if (text.includes("FROM stores WHERE id")) return [{ username: "m" }];
+      // EXISTS probes and FOR UPDATE reads find nothing.
+      return [];
+    };
+    const writeCall = async (
+      request: Request,
+    ): Promise<{ status: number; json: Record<string, unknown> }> => {
+      const response = await serveConnectRequest(request, ENV, writeRun, {
+        checker: createTestDoubleCredentialChecker(),
+        begin: async (fn) => fn(writeRun),
+      });
+      const text = await response.text();
+      return {
+        status: response.status,
+        json: text === "" ? {} : (JSON.parse(text) as Record<string, unknown>),
+      };
+    };
     for (const [service, method] of [
       ["MerchantService", "AddBook"],
       ["MerchantService", "RemoveBook"],
@@ -177,9 +220,9 @@ describe("P1 scope guards", () => {
       ["CustomerService", "CheckoutCart"],
       ["CustomerService", "AddReview"],
     ] as const) {
-      const { status, json } = await call(rpc(service, method, {}, MERCHANT));
-      expect(status, `${service}/${method}`).toBe(501);
-      expect(json.code).toBe("unimplemented");
+      const { status, json } = await writeCall(rpc(service, method, {}, MERCHANT));
+      expect(status, `${service}/${method}`).not.toBe(501);
+      expect(json.code, `${service}/${method}`).not.toBe("unimplemented");
     }
   });
 
