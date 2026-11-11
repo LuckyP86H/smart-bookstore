@@ -32,6 +32,11 @@
     }
   ],
 
+  // Route B P4: Workers AI binding, used by worker/src/ai/embeddings.ts.
+  // The model id itself is configuration (the EMBEDDING_MODEL var below),
+  // never hardcoded in code (plan §6).
+  "ai": { "binding": "AI" },
+
   // The React build (see "build" in package.json). The Worker runs first only
   // for API paths; every other request is answered from these static assets.
   "assets": {
@@ -93,6 +98,9 @@
     // PASSWORD_PEPPER secret is set in the dashboard, never here.
     "PBKDF2_ITERATIONS": "10000",
     "LLM_MODEL": "ollama/beam:cloud",
-    "LLM_API_BASE": "https://ollama.com"
+    "LLM_API_BASE": "https://ollama.com",
+    // Workers AI embedding model (Route B P4, plan §6): read by
+    // worker/src/ai/embeddings.ts via env.EMBEDDING_MODEL.
+    "EMBEDDING_MODEL": "@cf/baai/bge-m3"
   }
 }
