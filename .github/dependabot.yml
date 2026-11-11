@@ -147,3 +147,10 @@ updates:
     groups:
       ai-service-images:
         patterns: ["*"]
+    ignore:
+      # litellm declares Requires-Python <3.15 (even its latest release), so
+      # a python 3.15 base image can't install requirements.txt and the image
+      # build fails (PR #50). Revisit once litellm supports 3.15; patch-level
+      # base image updates still flow through.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

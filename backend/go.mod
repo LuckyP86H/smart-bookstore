@@ -6,6 +6,7 @@ require (
 	connectrpc.com/connect v1.21.1
 	github.com/lib/pq v1.12.3
 	golang.org/x/net v0.61.0
+	golang.org/x/crypto v0.58.0
 	google.golang.org/protobuf v1.36.12
 )
 

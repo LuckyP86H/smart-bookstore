@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     db_user: str = "postgres"
     db_password: str = "postgres"
     db_name: str = "bookstore"
+    # "require" for Supabase (TLS); docker-compose sets "disable" for the local DB
+    db_sslmode: str = "require"
 
     # Embedding model configuration
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

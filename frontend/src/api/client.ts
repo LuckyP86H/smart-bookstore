@@ -6,9 +6,7 @@ import { createConnectTransport } from "@connectrpc/connect-web";
 import type { Interceptor, Transport } from "@connectrpc/connect";
 // protoc-gen-es v2 emits service descriptors alongside the messages
 import { MerchantService, CustomerService } from "../gen/bookstore_pb";
-
-// Backend API URL - reads from environment variable or defaults to localhost
-const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8082";
+import { API_BASE_URL as baseUrl } from "./baseUrl";
 
 /**
  * Creates a ConnectRPC transport with optional authentication

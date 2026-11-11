@@ -166,6 +166,8 @@ uvicorn app.main:app --reload
 
 ### Tests
 
+The Go tests need the generated protobuf code, and `backend/gen/` is gitignored, so on a fresh clone run the `protoc` command from **Backend** above once before `go test`.
+
 ```bash
 cd backend    && go test ./...                      # Go
 cd ai-service && pip install -r requirements-dev.txt && pytest

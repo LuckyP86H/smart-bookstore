@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import './Chat.css';
-
-// Same backend base URL convention as api/client.ts
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+import { API_BASE_URL } from '../api/baseUrl';
 
 interface BookRecommendation {
   book_id: number;
