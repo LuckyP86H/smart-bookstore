@@ -12,8 +12,8 @@ sentence-transformers==6.2.0
 psycopg2-binary==2.9.13
 
 # Pydantic for data validation (litellm >=1.101 needs newer pydantic-settings)
-pydantic==2.14.1
-pydantic-settings==2.16.1
+pydantic==2.14.3
+pydantic-settings==2.16.2
 
 # HTTP client for health checks (litellm also depends on it)
 httpx>=0.28.1,<1.0

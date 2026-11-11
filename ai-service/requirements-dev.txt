@@ -5,8 +5,8 @@
 # (pip constraint files can't be used here: requirements.txt contains
 # extras like uvicorn[standard], which constraints reject.)
 fastapi==0.162.0
-pydantic==2.14.1
-pydantic-settings==2.16.1
+pydantic==2.14.3
+pydantic-settings==2.16.2
 python-dotenv==1.2.4
 httpx>=0.28.1,<1.0
 # Same certifi floor as requirements.txt (eMudhra/emSign CA incident).
