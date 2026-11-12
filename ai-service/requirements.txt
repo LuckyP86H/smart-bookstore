@@ -3,7 +3,11 @@ fastapi==0.162.0
 uvicorn[standard]==0.54.0
 
 # LiteLLM for LLM provider abstraction
-litellm==1.106.4
+# 1.109+ is required on the Python 3.15 base image (older lines cap
+# Requires-Python at <3.15, which is what broke the image build in PR #50).
+# NEVER pin 1.107.0: that PyPI release was compromised in the Oct 2026
+# supply-chain incident and shipped a credential stealer.
+litellm==1.109.1
 
 # Sentence transformers for embeddings
 sentence-transformers==6.2.0

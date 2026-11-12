@@ -147,3 +147,12 @@ updates:
     groups:
       ai-service-images:
         patterns: ["*"]
+    ignore:
+      # The python base image may only move when litellm's Requires-Python
+      # cap allows it: litellm <1.109 caps at <3.15 and 1.109 caps at <3.16,
+      # so a 3.16 base image would repeat the PR #50 breakage (pip cannot
+      # install requirements.txt and the image build fails). Move litellm
+      # first, then the base image, in one deliberate change; patch-level
+      # base image updates still flow through.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
