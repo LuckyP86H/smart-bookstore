@@ -20,6 +20,10 @@ A cell whose value is unavailable renders as `PENDING` — a `PENDING`
 cell means "not measured yet", never zero. Do not edit token cells by
 hand; the `<!--TOK:...-->` markers must survive for re-rendering.
 
+**v2 (2026-11-13):** the numbers below are the v2 re-measurement,
+taken after the PR #62 review fixes. See §6 for what changed, what
+did not, and why v2 supersedes the v1 figures.
+
 <!--
 TOKENS (filled by baselines.py; names listed without braces on purpose):
 SLICE_MANIFEST_GENERATED_AT, BENCHMARKS_MANIFEST_GENERATED_AT,
@@ -55,9 +59,9 @@ same slice, byte-for-byte.
 
 | Artifact | Generated at | Rows |
 |---|---|---|
-| Slice (`slice_manifest.json`) | <!--TOK:SLICE_MANIFEST_GENERATED_AT-->2026-11-11T11:27:24Z<!--/TOK--> | — |
-| Benchmarks (`benchmarks_manifest.json`) | <!--TOK:BENCHMARKS_MANIFEST_GENERATED_AT-->2026-11-11T12:21:01Z<!--/TOK--> | — |
-| Baselines (`baseline_results.json`) | <!--TOK:BASELINE_RESULTS_GENERATED_AT-->2026-11-11T12:23:04Z<!--/TOK--> | — |
+| Slice (`slice_manifest.json`) | <!--TOK:SLICE_MANIFEST_GENERATED_AT-->2026-11-13T05:39:32Z<!--/TOK--> | — |
+| Benchmarks (`benchmarks_manifest.json`) | <!--TOK:BENCHMARKS_MANIFEST_GENERATED_AT-->2026-11-13T06:49:48Z<!--/TOK--> | — |
+| Baselines (`baseline_results.json`) | <!--TOK:BASELINE_RESULTS_GENERATED_AT-->2026-11-13T06:51:54Z<!--/TOK--> | — |
 
 | Slice output | Rows | Parquet bytes | sha256 (first 16) |
 |---|---|---|---|
@@ -186,8 +190,8 @@ it is not an edition of.
 
 | Pairs | n | Fraction with similarity ≥ threshold |
 |---|---|---|
-| Positives (same work) | <!--TOK:BPAIRS_POS_N-->20000<!--/TOK--> | <!--TOK:BPAIRS_POS_FRAC_GE-->0.9768<!--/TOK--> |
-| Hard negatives (same first author, different works) | <!--TOK:BPAIRS_NEG_N-->20000<!--/TOK--> | <!--TOK:BPAIRS_NEG_FRAC_GE-->0.1596<!--/TOK--> |
+| Positives (same work) | <!--TOK:BPAIRS_POS_N-->20000<!--/TOK--> | <!--TOK:BPAIRS_POS_FRAC_GE-->0.9779<!--/TOK--> |
+| Hard negatives (same first author, different works) | <!--TOK:BPAIRS_NEG_N-->20000<!--/TOK--> | <!--TOK:BPAIRS_NEG_FRAC_GE-->0.1578<!--/TOK--> |
 
 ### 4.3 The gates these baselines are read against (§3.4)
 
@@ -235,3 +239,53 @@ off the same numbers.
 - **Reproducibility.** Re-running `slice.py` on the same dump snapshot
   must reproduce the slice byte-for-byte (check the sha256 prefixes in
   §1 against a re-run before trusting any later number in this file).
+
+## 6. v2 re-measurement (2026-11-13) — supersedes the v1 numbers
+
+The pipeline was re-run end to end (slice → benchmarks → baselines)
+after the fixes from Lily's PR #62 review (CHANGES_REQUESTED):
+`plan_edition_quotas` now distributes the remainder by fair-share
+deficit (v1 used the deficit against the work's full edition count),
+`VOLUME_RE` no longer matches bare `part` / 上 / 下 substrings, and
+`trigram_set` applies NFKC normalisation. One further defect was
+found and fixed during the re-measurement (last bullet). Where v1
+figures are quoted below, they are the original PR #62 measurements.
+
+- **Slice: unchanged, byte-for-byte.** Same 4,993 works / 20,000
+  editions / 5,070 authors; the §1 sha256 prefixes are identical to
+  v1's, and the per-work edition allocation is identical for all
+  5,000 works. The quota defect did not skew the delivered slice: on
+  the real catalogue the slice works hold 661,296 editions against a
+  20,000 cap, so the floored quotas (minimum 1 per work) sum to
+  20,910 — above the cap — and the reduction loop, identical in both
+  versions, set the final quotas; the corrected remainder loop never
+  governed. The defect is real (on a synthetic 37,196-edition
+  distribution the v1 rule gave the largest work 1,194 editions
+  against a 646 fair share) and the fix stands; its blast radius on
+  this slice is zero. The collisions stratum re-measured at 1,448 —
+  unchanged, and the §2 explanation stands as written.
+- **Headline baselines: unchanged.** Path A control join hit rate
+  0.9996; trigram B-mask candidate recall 0.0462 and auto-link
+  precision 0.1514 (199/1,314); B-open false-link rate 0.2270
+  (454/2,000). The B-mask / B-open / B-enzh suite files are
+  byte-identical to v1.
+- **B-pairs separability: small moves.** Positives with similarity
+  ≥ 0.5: 0.9769 (19,537/20,000) → 0.9780 (19,559/20,000). The
+  positive pair set is identical across versions, so this +22 is the
+  NFKC normalisation's effect on scoring alone. Negatives: 0.1597
+  (3,193/20,000) → 0.1578 (3,156/20,000) — the v2 negative set is a
+  fresh draw (see the determinism bullet), so that delta mixes the
+  redraw with NFKC and is not a pair-by-pair comparison.
+- **B-pairs strata: the `volumes` label shrank as intended.**
+  Volumes-labelled pairs: 800 → 482 of 40,000. On the identical
+  positive set: 307 → 204 (−34%) — the v1 pattern had been labelling
+  ordinary titles ("The Departure", 上海故事…) as volumes.
+- **Determinism defect found and fixed.** v1's hard-negative draw
+  was not reproducible despite the fixed seed: the author-pool query
+  in `build_pairs` had no ORDER BY, so the seeded rng indexed into
+  an author list ordered by DuckDB's unstable scan order (15,598 of
+  20,000 negatives differed between two v1-code runs). The query now
+  ends `ORDER BY first_author, edition_key`, and the hash orderings
+  feeding it carry key tiebreaks. Proof: two consecutive v2 runs of
+  the benchmarks stage produce byte-identical suite files (all
+  four).

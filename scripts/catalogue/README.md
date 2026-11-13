@@ -128,7 +128,9 @@ Verify a re-run by comparing the sha256 prefixes printed in
 
 Short terminal replays of the four parts of the pipeline, rendered by
 `make_gifs.py` from the real run logs (progress log, dump manifests,
-checkpoints and results JSONs of the 2026-11-11 build). They are
+checkpoints and results JSONs of the 2026-11-11 build; the slice and
+benchmarks replays were re-rendered from the 2026-11-13 v2
+re-measurement — see `BASELINES.md` §6). They are
 **scripted replays of the real commands and their real outputs — not
 live screen captures**, and each GIF says so in its footer.
 

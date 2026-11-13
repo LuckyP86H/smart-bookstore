@@ -360,7 +360,7 @@ def build_pairs(
         WHERE work_key IS NOT NULL
         GROUP BY work_key
         HAVING count(*) >= 2
-        ORDER BY hash(work_key, {SEED})
+        ORDER BY hash(work_key, {SEED}), work_key
         LIMIT 40000
         """
     ).fetchall()
@@ -403,7 +403,7 @@ def build_pairs(
                 list_extract(w.author_keys, 1) AS first_author,
                 row_number() OVER (
                     PARTITION BY list_extract(w.author_keys, 1)
-                    ORDER BY hash(e.key, {SEED})
+                    ORDER BY hash(e.key, {SEED}), e.key
                 ) AS rn
             FROM {parquet(data_dir, 'editions.parquet')} e
             JOIN {parquet(data_dir, 'works.parquet')} w ON w.key = e.work_key
@@ -418,13 +418,19 @@ def build_pairs(
             SELECT first_author
             FROM author_work_counts
             WHERE n_works >= 2
-            ORDER BY hash(first_author, {SEED})
+            ORDER BY hash(first_author, {SEED}), first_author
             LIMIT 30000
         )
+        -- The outer ORDER BY is load-bearing: by_author's insertion
+        -- order (hence the authors list the rng indexes into) follows
+        -- this fetch's row order, and an unordered DuckDB scan does
+        -- not return rows in a stable order between runs. Without it
+        -- the seeded draw of hard negatives was not reproducible.
         SELECT a.first_author, a.edition_key, a.work_key
         FROM edition_authors a
         JOIN candidate_authors c ON c.first_author = a.first_author
         WHERE a.rn <= 20
+        ORDER BY a.first_author, a.edition_key
         """
     ).fetchall()
     by_author: dict = {}
