@@ -8,7 +8,7 @@ through independent code paths and compare:
   (hyphens, spaces, lower-case ``x``, X check digits, a 979-prefix
   ISBN-13, and bad-checksum rejects). Expected values are worked by
   hand, never computed by the code under test.
-* ``<kind>_linecount`` — raw dump line count (``gzip -dc | wc -l``, an
+* ``<kind>_linecount`` — raw dump line count (``gzip -dc`` run as an
   independent process) vs the parser checkpoint vs Parquet rows +
   rejected lines.
 * ``<kind>_golden_first`` / ``editions_golden_deep`` — one raw dump
@@ -67,10 +67,16 @@ def duck(data_dir: Path) -> duckdb.DuckDBPyConnection:
 
 
 def raw_line_count(gz_path: Path) -> int:
-    out = subprocess.run(
-        f"gzip -dc '{gz_path}' | wc -l",
-        shell=True, capture_output=True, text=True, check=True)
-    return int(out.stdout.strip())
+    """Newline count of the decompressed dump, via an independent
+    ``gzip -dc`` process (argv list, no shell) counted in chunks."""
+    proc = subprocess.Popen(["gzip", "-dc", str(gz_path)],
+                            stdout=subprocess.PIPE)
+    count = 0
+    while chunk := proc.stdout.read(1 << 20):
+        count += chunk.count(b"\n")
+    if proc.wait() != 0:
+        raise subprocess.CalledProcessError(proc.returncode, proc.args)
+    return count
 
 
 def dump_record_at(gz_path: Path, line_no: int) -> dict[str, Any]:
@@ -122,6 +128,9 @@ def test_isbn_unit() -> None:
 # ---------------------------------------------------------------------------
 
 def test_linecount(data_dir: Path, kind: str) -> bool:
+    """Reconcile three independent counts of the same dump: the raw
+    line count, the parser checkpoint, and Parquet rows + rejected
+    lines (the module docstring's promise). All three must agree."""
     gz = data_dir / "dumps" / f"ol_dump_{kind}_latest.txt.gz"
     ckpt_path = data_dir / "parquet" / f"{kind}.ckpt.json"
     parquet = data_dir / "parquet" / f"{kind}.parquet"
@@ -138,10 +147,13 @@ def test_linecount(data_dir: Path, kind: str) -> bool:
                f"parse not finished: ckpt_lines={ckpt['lines_done']} "
                f"of raw={raw}")
         return False
-    ok = rows == ckpt["rows_written"]
+    ok = (rows == ckpt["rows_written"]
+          and rows + ckpt["rejected"] == ckpt["lines_done"]
+          and ckpt["lines_done"] == raw)
     record(f"{kind}_linecount", "PASS" if ok else "FAIL",
            f"raw={raw} ckpt_lines={ckpt['lines_done']} "
-           f"parquet_rows={rows} rejected={ckpt['rejected']}")
+           f"parquet_rows={rows} rejected={ckpt['rejected']} "
+           f"rows+rejected={rows + ckpt['rejected']}")
     return ok
 
 
@@ -370,8 +382,6 @@ def test_idempotency(data_dir: Path, repo_dir: Path) -> None:
                         ("parse_works", "works"),
                         ("parse_editions", "editions")):
         ckpt_path = data_dir / "parquet" / f"{ckpt}.ckpt.json"
-        gz = data_dir / "dumps" / f"ol_dump_{ckpt.replace('_authors', '')}" \
-                                 "_latest.txt.gz"
         if ckpt_path.exists():
             candidates.append((stage, ckpt_path))
     if not candidates:

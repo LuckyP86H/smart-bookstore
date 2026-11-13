@@ -87,6 +87,13 @@ strata counts in both).
 | shelf | Owner's shelf work keys, if the file exists | <!--TOK:STRATUM_SHELF_WORKS-->0<!--/TOK--> |
 | **Total (union, de-duplicated)** | Trim rule and edition-cap rule are recorded in `slice_manifest.json` | **<!--TOK:SLICE_WORKS_ROWS-->4993<!--/TOK--> works / <!--TOK:SLICE_EDITIONS_ROWS-->20000<!--/TOK--> editions / <!--TOK:SLICE_AUTHORS_ROWS-->5070<!--/TOK--> authors** |
 
+Why collisions measured 1,448 against its ~800 cap: the cap is a
+target, not a hard limit. Collisions works are selected and trimmed in
+whole normalised-title groups — the never-split-a-group rule — and a
+few normalised titles are shared by thousands of distinct works, so
+keeping groups whole let the stratum overrun to 1,448 rather than
+splitting a group to hit the number exactly.
+
 The plan's §4.3 size table, with the estimate column reproduced and a
 measured column filled from `slice_manifest.json` + ISBN statistics.
 PR 1 measures the Parquet artefacts; the loaded Postgres footprint is

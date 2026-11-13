@@ -83,6 +83,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -140,11 +141,16 @@ def parquet(data_dir: Path, *parts: str) -> str:
 # ---------------------------------------------------------------------------
 
 def trigram_set(text) -> frozenset:
-    """pg_trgm trigram set: two spaces before, one after, per word."""
+    """pg_trgm trigram set: two spaces before, one after, per word.
+
+    NFKC-normalised first, so full-width and half-width forms of the
+    same title (common across EN/ZH catalogue data) produce the same
+    trigrams instead of disjoint sets.
+    """
     if not text:
         return frozenset()
     trigrams = set()
-    for word in WORD_RE.findall(text.lower()):
+    for word in WORD_RE.findall(unicodedata.normalize("NFKC", text).lower()):
         padded = "  " + word + " "
         for i in range(len(padded) - 2):
             trigrams.add(padded[i : i + 3])

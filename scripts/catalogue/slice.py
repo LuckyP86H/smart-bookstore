@@ -358,10 +358,18 @@ def evenly_spaced(sorted_keys: list, quota: int) -> list:
 
 
 def plan_edition_quotas(counts: dict, cap: int) -> dict:
-    """Proportional per-work edition quotas (minimum 1) summing to <= cap."""
+    """Proportional per-work edition quotas (minimum 1) summing to <= cap.
+
+    Each work starts at its floored fair share, clamped to its own
+    edition count (a quota never exceeds the editions the work has);
+    the remainder is then distributed one edition at a time to the
+    work furthest below its fair share. Degenerate case: when
+    cap < number of works, the minimum-1 rule wins and the sum is the
+    work count — minimum 1 and sum <= cap cannot both hold there.
+    """
     total = sum(counts.values())
     quotas = {
-        key: max(1, (cap * n) // total) for key, n in counts.items()
+        key: min(n, max(1, (cap * n) // total)) for key, n in counts.items()
     }
     # Reduce from the largest quotas if the minimum-1 rule overshot the cap.
     while sum(quotas.values()) > cap:
@@ -376,7 +384,7 @@ def plan_edition_quotas(counts: dict, cap: int) -> dict:
             break
         key = max(
             candidates,
-            key=lambda k: (counts[k] - quotas[k], k),
+            key=lambda k: (cap * counts[k] / total - quotas[k], k),
         )
         quotas[key] += 1
     return quotas

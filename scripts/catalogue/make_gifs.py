@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -34,10 +35,30 @@ DIM = (110, 118, 129)
 GREEN = (63, 185, 80)
 CYAN = (88, 166, 255)
 FOOTER = "Terminal replay rendered from the real run logs — not a live screen capture."
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
-FONT = ImageFont.truetype(FONT_PATH, 21)
-FONT_S = ImageFont.truetype(FONT_PATH, 16)
+def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """DejaVu Sans Mono via a small fallback chain (no single hardcoded
+    path): $CATALOGUE_FONT_DIR first, then the usual system font dirs,
+    then PIL's bundled default."""
+    name = "DejaVuSansMono-Bold.ttf" if bold else "DejaVuSansMono.ttf"
+    dirs = []
+    if os.environ.get("CATALOGUE_FONT_DIR"):
+        dirs.append(Path(os.environ["CATALOGUE_FONT_DIR"]))
+    dirs += [
+        Path("/usr/share/fonts/truetype/dejavu"),
+        Path("/usr/share/fonts/TTF"),
+        Path.home() / ".fonts",
+        Path.home() / ".local/share/fonts",
+    ]
+    for directory in dirs:
+        candidate = directory / name
+        if candidate.exists():
+            return ImageFont.truetype(str(candidate), size)
+    return ImageFont.load_default()
+
+
+FONT = _load_font(21)
+FONT_S = _load_font(16)
+FONT_BOLD = _load_font(21, bold=True)
 LINE_H = 30
 TOP = 56
 LEFT = 28
@@ -113,8 +134,7 @@ def dim(text: str) -> tuple[str, tuple[int, int, int]]:
 def gif_fetch(data_dir: Path, out_dir: Path) -> None:
     steps = [cmd("bash scripts/catalogue/fetch_dumps.sh")]
     for line in log_lines(data_dir, "fetch", 8):
-        steps.append(out(line.replace("[2026-11-11T", "[").split("] ", 1)[-1]
-                         if "] " in line else line))
+        steps.append(out(line.split("] ", 1)[-1] if "] " in line else line))
     steps.append(cmd("cat dumps/ol_dump_authors_latest.txt.gz.manifest.json"))
     manifest = read_json(data_dir / "dumps"
                          / "ol_dump_authors_latest.txt.gz.manifest.json")
@@ -153,10 +173,11 @@ def gif_slice(data_dir: Path, out_dir: Path) -> None:
         "strata_counts") or {}
     for stratum, n in counts.items():
         steps.append(out(f"stratum {stratum:<24} {n:>6,} works"))
-    totals = manifest.get("totals") or {}
-    for key, value in totals.items():
-        steps.append(ok(f"{key}: {value:,}") if isinstance(value, int)
-                     else out(f"{key}: {value}"))
+    # Slice totals live at the manifest's top level (there is no
+    # "totals" sub-object; reading one silently rendered no totals).
+    for key in ("total_works", "total_editions", "total_authors"):
+        if isinstance(manifest.get(key), int):
+            steps.append(ok(f"{key}: {manifest[key]:,}"))
     steps.append(dim("# adversarial slice per plan section 4.3 — "
                      "not a random sample"))
     animate(steps, "PR 1 · 3/4 build the reference slice", out_dir
@@ -170,9 +191,17 @@ def gif_benchmarks(data_dir: Path, out_dir: Path) -> None:
                  "--data-dir $DATA_DIR --only benchmarks"),
              cmd("python scripts/catalogue/run_pipeline.py "
                  "--data-dir $DATA_DIR --only baselines")]
-    counts = bench.get("suite_counts") or bench.get("counts") or {}
-    for suite, n in counts.items():
-        steps.append(out(f"suite {suite:<22} {n:>7,} cases"))
+    # Suite counts live under bench["suites"][name]["rows"] (there is
+    # no "suite_counts" key; reading one silently rendered no suites).
+    for suite, info in (bench.get("suites") or {}).items():
+        rows = info.get("rows")
+        if not isinstance(rows, int):
+            continue
+        line = f"suite {suite:<22} {rows:>7,} cases"
+        if isinstance(info.get("positives"), int) \
+                and isinstance(info.get("negatives"), int):
+            line += f" ({info['positives']:,} pos + {info['negatives']:,} neg)"
+        steps.append(out(line))
     steps.append(dim(""))
 
     def walk(node: Any, prefix: str = "") -> None:

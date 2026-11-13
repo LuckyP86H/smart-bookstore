@@ -129,10 +129,18 @@ def part_path(directory: Path, stem: str, index: int) -> Path:
 
 
 def write_part(rows: list[dict[str, Any]], schema: pa.Schema, path: Path) -> None:
-    """Write one chunk of rows to *path* as its own Parquet file."""
+    """Write one chunk of rows to *path* as its own Parquet file.
+
+    Atomic (tmp file + rename, the save_checkpoint pattern): a crash
+    mid-write leaves a stray ``.tmp`` that part_paths never matches,
+    instead of a truncated part file that next_part_index would keep
+    and finalize_parts would fail reading — potentially hours in.
+    """
     table = pa.Table.from_pylist(rows, schema=schema)
-    with pq.ParquetWriter(path, schema) as writer:
+    tmp = path.with_name(path.name + ".tmp")
+    with pq.ParquetWriter(tmp, schema) as writer:
         writer.write_table(table)
+    tmp.replace(path)
 
 
 def finalize_parts(output_path: Path, schema: pa.Schema, stem: str) -> int:
@@ -488,6 +496,15 @@ def run(args: argparse.Namespace) -> int:
                 )
 
     flush_buffer(total_lines)
+    # flush_buffer skips the checkpoint save when the buffer is empty
+    # (e.g. a long run of rejected lines at EOF); persist the final
+    # position unconditionally so a resume never rescans a completed
+    # file. (Mirrors parse_wikidata.py.)
+    save_checkpoint(ckpt_path, {
+        "lines_done": total_lines,
+        "rows_written": rows_written,
+        "rejected": rejected,
+    })
 
     merged = finalize_parts(output_path, schema, kind)
     elapsed = max(time.monotonic() - started, 1e-9)

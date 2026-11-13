@@ -97,7 +97,15 @@ B_ENZH_CASES = 1000
 BUCKETS = ("pre1990_zh", "pre1990", "zh", "modern")
 BUCKET_WEIGHTS = {"pre1990_zh": 9, "pre1990": 3, "zh": 3, "modern": 1}
 
-VOLUME_RE = re.compile(r"vol\.|volume|part|上|下|第.+卷|册", re.IGNORECASE)
+# Volume markers for the B-pairs `volumes` stratum. Latin markers must
+# be whole words ("part" inside "Departure"/"Party" is not a volume);
+# CJK markers must be volume-specific contexts (bare 上/下 also fire on
+# 上海, 上下五千年, ...). 册 alone stays: it is the volume counter and
+# covers 上册/中册/下册 alike.
+VOLUME_RE = re.compile(
+    r"\bvol\.|\bvolumes?\b|\bparts?\b|上册|下册|上卷|下卷|上篇|下篇|第.+卷|册",
+    re.IGNORECASE,
+)
 COMPANION_RE = re.compile(
     r"导读|解读|study guide|summary|workbook|companion", re.IGNORECASE
 )

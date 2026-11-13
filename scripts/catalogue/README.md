@@ -20,7 +20,7 @@ DATA_DIR = ~/workspace/review-scratch/smart-bookstore-p4-data/
 ├── dumps/     # raw OL dump .txt.gz files + per-file *.manifest.json + .done markers
 ├── parquet/   # full-catalogue Parquet + slice_*.parquet + benchmarks/
 ├── out/       # manifests, baseline_results.json, excluded-key lists
-├── venv/      # Python venv: duckdb 2.0.0 + pyarrow 26
+├── venv/      # Python venv; pinned deps in requirements.txt (this dir)
 └── progress.log
 ```
 
@@ -46,7 +46,10 @@ which rewrites `BASELINES.md` in place (its render step).
 parse_editions → isbn_map → slice → benchmarks → baselines), with
 done-markers under `$DATA_DIR/stages/`; a bare invocation runs
 whatever is incomplete, and `--only <stage>` runs a single stage.
-Every stage is idempotent, all run with the data venv's Python.
+Every stage is idempotent, all run with the data venv's Python
+(create it with `python3 -m venv $DATA_DIR/venv` and
+`$DATA_DIR/venv/bin/pip install -r scripts/catalogue/requirements.txt`;
+Pillow in that file is only needed by `make_gifs.py`).
 DuckDB is capped in every script (`threads=2`, `memory_limit='3GB'`,
 `temp_directory=$DATA_DIR`) per the VM stability rules — one heavy job
 at a time.
@@ -57,7 +60,8 @@ PY=$DATA_DIR/venv/bin/python
 
 # 0. Fetch the dumps (resume-able; skips files with a valid .done marker).
 #    Records file/url/bytes/sha256/source_last_modified/fetched_at per dump
-#    in dumps/<file>.manifest.json — manifest.example.json shows the shape.
+#    in dumps/<file>.manifest.json — one manifest file per dump;
+#    manifest.example.json shows the shape of a single one.
 $PY scripts/catalogue/run_pipeline.py --data-dir $DATA_DIR --only fetch
 #    (equivalently: scripts/catalogue/fetch_dumps.sh)
 
