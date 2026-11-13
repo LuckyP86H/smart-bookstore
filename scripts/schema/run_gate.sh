@@ -11,7 +11,16 @@
 #                 the live schema; live tables hold 0 rows, so applying
 #                 the new 5 on top in the same order is the honest
 #                 rehearsal) -> fixtures.sql -> assertions.sql ->
-#                 fixture_assertions.sql -> the 384/1024-dimension test
+#                 fixture_assertions.sql -> the dimension test (which
+#                 now proves the DEFERRED switch: books.embedding is
+#                 still vector(384), so a 384-dimension insert succeeds
+#                 and a 1024-dimension insert fails)
+#
+# The harness also runs the repo's vitest suite (`npm test` in the repo
+# root) and captures its output to npm-test.log in the log directory —
+# scripts/schema/make_gifs.py renders the test-suite GIF from that log,
+# so the README regeneration flow consumes only files this script
+# produces.
 #
 # Migration tracking mirrors Supabase (D-R5): each DB keeps a
 # p4_gate.applied_migrations table and every file is applied exactly
@@ -182,6 +191,10 @@ gen_vector() { # gen_vector <dimensions> -> "[0.1,0.1,...]"
 }
 
 dimension_test() { # dimension_test <db> <logfile>
+  # Proves the deferred switch (see 20261111130400's header): the live
+  # ai-service contract is 384 dimensions, so books.embedding must
+  # still ACCEPT a 384-dimension vector and REJECT a 1024-dimension
+  # one. (Before the deferral this test asserted the exact opposite.)
   local db="$1" log="$2" out code rc=0
   echo "=== dimension test on $db ===" >> "$log"
   out=$(psql_db "$db" -v ON_ERROR_STOP=1 -qc \
@@ -191,10 +204,11 @@ dimension_test() { # dimension_test <db> <logfile>
              '$(gen_vector 384)'::extensions.vector)" 2>&1)
   code=$?
   echo "384-dim insert exit=$code: $out" >> "$log"
-  if [ "$code" -ne 0 ] && printf '%s' "$out" | grep -qi 'dimension'; then
-    echo "PASS: 384-dimension insert failed loud, error mentions dimensions" | tee -a "$log"
+  if [ "$code" -eq 0 ]; then
+    echo "PASS: 384-dimension insert succeeded (books.embedding stays vector(384))" | tee -a "$log"
+    psql_db "$db" -qc "delete from public.books where title = 'dimension probe 384'" >> "$log" 2>&1
   else
-    echo "FAIL: 384-dimension insert should have failed with a dimension error (exit=$code)" | tee -a "$log"
+    echo "FAIL: 384-dimension insert should have succeeded — the ai-service contract is 384 (exit=$code)" | tee -a "$log"
     rc=1
   fi
   out=$(psql_db "$db" -v ON_ERROR_STOP=1 -qc \
@@ -204,11 +218,10 @@ dimension_test() { # dimension_test <db> <logfile>
              '$(gen_vector 1024)'::extensions.vector)" 2>&1)
   code=$?
   echo "1024-dim insert exit=$code: $out" >> "$log"
-  if [ "$code" -eq 0 ]; then
-    echo "PASS: 1024-dimension insert succeeded" | tee -a "$log"
-    psql_db "$db" -qc "delete from public.books where title = 'dimension probe 1024'" >> "$log" 2>&1
+  if [ "$code" -ne 0 ] && printf '%s' "$out" | grep -qi 'dimension'; then
+    echo "PASS: 1024-dimension insert failed loud, error mentions dimensions (switch still deferred)" | tee -a "$log"
   else
-    echo "FAIL: 1024-dimension insert should have succeeded (exit=$code)" | tee -a "$log"
+    echo "FAIL: 1024-dimension insert should have failed with a dimension error — books.embedding must stay 384 until P5 (exit=$code)" | tee -a "$log"
     rc=1
   fi
   return $rc
@@ -242,14 +255,24 @@ run_sql_gate "assertions.sql on $LIVE_DB" "$LIVE_DB" "$SCRIPT_DIR/assertions.sql
 run_sql_gate "fixture_assertions.sql on $LIVE_DB" "$LIVE_DB" "$SCRIPT_DIR/fixture_assertions.sql" "$LOG_DIR/fixture-assertions.log"
 
 dimension_test "$LIVE_DB" "$LOG_DIR/dimensions.log"
-record "dimension test on $LIVE_DB (384 fails, 1024 succeeds)" $?
+record "dimension test on $LIVE_DB (books.embedding stays 384: 384 succeeds, 1024 fails)" $?
+
+# The vitest suite, captured to npm-test.log for make_gifs.py (the
+# schema GIFs render from this harness's logs only).
+(cd "$REPO_ROOT" && npm test) > "$LOG_DIR/npm-test.log" 2>&1
+record "npm test (vitest suite; output in npm-test.log)" $?
 
 # D-R5 demonstration: re-running the apply step is a no-op on both DBs.
-{
-  apply_migrations "$FRESH_DB" "$LOG_DIR/noop-rerun.log"
-  apply_migrations "$LIVE_DB" "$LOG_DIR/noop-rerun.log"
-} >/dev/null 2>&1
-record "migration re-apply is a no-op (D-R5)" $?
+# Each apply's exit code is captured SEPARATELY: judging the step by
+# the brace group's status would report only the LAST apply and mask a
+# failure of the fresh-DB apply behind a successful live-DB one.
+apply_migrations "$FRESH_DB" "$LOG_DIR/noop-rerun.log" >/dev/null 2>&1
+NOOP_FRESH_RC=$?
+apply_migrations "$LIVE_DB" "$LOG_DIR/noop-rerun.log" >/dev/null 2>&1
+NOOP_LIVE_RC=$?
+NOOP_RC=0
+if [ "$NOOP_FRESH_RC" -ne 0 ] || [ "$NOOP_LIVE_RC" -ne 0 ]; then NOOP_RC=1; fi
+record "migration re-apply is a no-op (D-R5)" $NOOP_RC
 
 PASS_LINES=$(grep -h -c 'PASS' "$LOG_DIR"/assertions-fresh.log "$LOG_DIR"/assertions-live.log \
   "$LOG_DIR"/fixture-assertions.log "$LOG_DIR"/dimensions.log 2>/dev/null | awk '{s += $1} END {print s + 0}')

@@ -34,13 +34,61 @@ RED = (248, 81, 73)
 CYAN = (121, 192, 255)
 DIM = (139, 148, 158)
 
-LATIN_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-CJK_FONT_PATH = "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"
 FOOTER = "Terminal replay rendered from the real run logs — not a live screen capture"
 
-latin = ImageFont.truetype(LATIN_FONT_PATH, FONT_SIZE)
-cjk = ImageFont.truetype(CJK_FONT_PATH, FONT_SIZE)
-latin_b = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", FONT_SIZE)
+# Font lookup follows the same fallback pattern as
+# scripts/catalogue/make_gifs.py: $SCHEMA_FONT_DIR first, then the
+# usual system font dirs, then PIL's own font search, then PIL's
+# bundled default — no single hardcoded machine path. The opentype
+# dirs matter: on current Debian/Ubuntu, Noto Sans CJK lives under
+# /usr/share/fonts/opentype/noto, NOT truetype/noto — the pre-fix
+# script hardcoded the truetype path and only rendered CJK at all
+# because Pillow's truetype() silently searches by basename when a
+# path misses. (Pillow is pinned in scripts/schema/requirements.txt.)
+_FONT_DIRS = []
+if os.environ.get("SCHEMA_FONT_DIR"):
+    _FONT_DIRS.append(os.environ["SCHEMA_FONT_DIR"])
+_FONT_DIRS += [
+    "/usr/share/fonts/truetype/dejavu",
+    "/usr/share/fonts/truetype/noto",
+    "/usr/share/fonts/opentype/noto",
+    "/usr/share/fonts/opentype",
+    "/usr/share/fonts/TTF",
+    "/usr/share/fonts/truetype",
+    "/usr/share/fonts",
+    os.path.expanduser("~/.fonts"),
+    os.path.expanduser("~/.local/share/fonts"),
+]
+
+
+def _load_font(candidates: list[str], size: int):
+    for directory in _FONT_DIRS:
+        for name in candidates:
+            path = os.path.join(directory, name)
+            if os.path.isfile(path):
+                return ImageFont.truetype(path, size)
+    # Let Pillow's own basename search try before giving up — it knows
+    # font locations this list may not (e.g. a distro that moves a
+    # family between truetype/ and opentype/ again).
+    for name in candidates:
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+latin = _load_font(["DejaVuSansMono.ttf"], FONT_SIZE)
+cjk = _load_font(
+    [
+        "NotoSansCJK-Regular.ttc",
+        "NotoSansCJK-Regular.otf",
+        "NotoSansJP-Regular.otf",
+        "NotoSansSC-Regular.otf",
+    ],
+    FONT_SIZE,
+)
+latin_b = _load_font(["DejaVuSansMono-Bold.ttf", "DejaVuSansMono.ttf"], FONT_SIZE)
 
 CJK_RE = re.compile(r"[⺀-鿿豈-﫿぀-ヿ가-힯]")
 
@@ -147,7 +195,7 @@ def main() -> int:
         ["# sb_p4_fresh: scaffolding + all 8 migrations, in filename order"]
         + applying_fresh
         + pick(gate, lambda ln: "prepare sb_p4_fresh" in ln and "PASS" in ln)
-        + ["# assertions.sql on sb_p4_fresh: 8/8 PASS (see 02 for the list)"],
+        + ["# assertions.sql on sb_p4_fresh: 9/9 PASS (see 02 for the list)"],
         os.path.join(out_dir, "01-migrations-fresh.gif"),
     )
 
@@ -155,7 +203,7 @@ def main() -> int:
     render(
         "$ scripts/schema/run_gate.sh   # live-equivalent rehearsal",
         ["# sb_p4_live: the 3 existing migrations ARE the live schema (0 rows),"]
-        + ["# then the 5 new ones rehearse on top — the Step 3 application order"]
+        + ["# then the 5 new Step 2 migrations rehearse on top, in filename order"]
         + applying_live
         + pick(assertions_live, lambda ln: "PASS:" in ln),
         os.path.join(out_dir, "02-migrations-live-rehearsal.gif"),

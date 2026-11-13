@@ -1,0 +1,4 @@
+# Python dependencies for scripts/schema/make_gifs.py (the only Python
+# in this harness — everything else is bash + psql). Pinned to the
+# version the PR 2 gate GIFs were rendered with (system python3).
+Pillow==10.2.0

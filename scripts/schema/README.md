@@ -2,9 +2,11 @@
 
 Rehearses the P4 schema migrations against a scratch Postgres and proves
 they behave, before anything is applied to the real Supabase project.
-The harness is bash + `psql` only (decision D-R3 in
-`PR2-BUILD-LOG.md`: no Docker in the rehearsal environment, and the
-repo's vitest suite never opens a database).
+The harness is bash + `psql` for the schema half (decision D-R3 in
+`docs/PR2-BUILD-LOG.md`: no Docker in the rehearsal environment, and
+the repo's vitest suite never opens a database); the same script also
+runs `npm test` once at the end and captures it to `npm-test.log`, so
+every log the GIF renderer consumes comes from one harness run.
 
 ## Files
 
@@ -14,7 +16,7 @@ repo's vitest suite never opens a database).
 | `scaffolding.sql` | **Environment replication, not a migration** — see the honesty note below. |
 | `fixtures.sql` | Synthetic gate data for the live-equivalent DB only (snapshot `fixture-2026-11-11`): two merchant stores + one customer store, listings covering the same-ISBN pair / lying ISBN, hyphen-variant and lowercase-x ISBN-10 variants, a NULL-ISBN 红楼梦， one sold listing, plus the reference catalogue, facets, evidence, assertions, links, task, prompts, ai_runs, works projection and review-aspects rows. Everything is flagged `is_synthetic`. |
 | `assertions.sql` | Schema-level assertions (DO blocks that raise on failure, `PASS …` selects on success). No fixture dependency, so it runs against **both** DBs. |
-| `fixture_assertions.sql` | Data assertions: fixture row counts, the Path A control join, the lying-ISBN join, the two CHECK-rejection probes, task claimability. Live-equivalent DB only. |
+| `fixture_assertions.sql` | Data assertions: fixture row counts, the Path A control join, the lying-ISBN join, the three CHECK-rejection probes (evidence candidates, listing-link target shape, assertion self-pair), task claimability. Live-equivalent DB only. |
 
 ## The D-R4 scaffolding honesty note
 
@@ -45,11 +47,21 @@ migration files run verbatim, exactly as they run on Supabase.
    applying the 5 new ones on top in filename order is the honest
    rehearsal of the live upgrade — there is no data migration to fake.
 3. **Dimension test** (in `run_gate.sh`, deliberately not in the SQL
-   files, because it must assert on a *failure*): inserting a
-   384-dimension vector into `books.embedding` must exit non-zero with
-   an error mentioning dimensions; a 1024-dimension insert must
-   succeed. The probe row is deleted afterwards.
-4. **No-op re-run (D-R5)** — migration tracking mirrors Supabase: each
+   files, because it must assert on a *failure*): the
+   `books.embedding` switch from 384 to 1024 dimensions is **deferred**
+   to the P5 change that retires/migrates the Python ai-service (whose
+   live contract is 384 dimensions — see the header of
+   `20261111130400_p4_ai_platform.sql`), so the test now proves the
+   deferral: inserting a 384-dimension vector into `books.embedding`
+   must **succeed**, and a 1024-dimension insert must exit non-zero
+   with an error mentioning dimensions. The probe row is deleted
+   afterwards. (The ref-side 1024 contract is unaffected and is
+   asserted in `assertions.sql`: `ref_works.embedding` is
+   halfvec(1024).)
+4. **Test suite** — `npm test` runs in the repo root; output is
+   captured to `npm-test.log` in the log directory (the file
+   `make_gifs.py` renders the test-suite GIF from).
+5. **No-op re-run (D-R5)** — migration tracking mirrors Supabase: each
    DB keeps a `p4_gate.applied_migrations` table and every file is
    applied exactly once. Re-running the apply step prints `NO-OP` and
    changes nothing; re-running the whole harness against a complete
@@ -58,7 +70,9 @@ migration files run verbatim, exactly as they run on Supabase.
    run) is dropped and recreated so the run starts deterministically;
    `GATE_FRESH=1` forces that drop+recreate even for a complete DB.
    (The fixed DB names, rather than per-run suffixed names, are what
-   make the no-op re-run possible.)
+   make the no-op re-run possible.) The step judges each database's
+   re-apply by its own exit code — a fresh-DB failure can no longer be
+   masked by a successful live-DB re-apply.
 
 ## How to run it
 
@@ -85,16 +99,19 @@ GATE_FRESH=1 scripts/schema/run_gate.sh
 Exit code is 0 only when every gate step passes. Per-step output lands
 in the log directory: `fresh-setup.log`, `live-setup.log`,
 `assertions-fresh.log`, `assertions-live.log`, `fixture-assertions.log`,
-`dimensions.log`, `noop-rerun.log`, and the running `gate.log`.
+`dimensions.log`, `npm-test.log`, `noop-rerun.log`, and the running
+`gate.log`.
 
 ## Watch it run (replays)
 
-Terminal replays rendered from the real run logs of the 2026-11-11 gate
-run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster) — each GIF
-carries the disclosure in its footer; regenerate with
-`GATE_LOG_DIR=<log dir> python3 scripts/schema/make_gifs.py`.
+Terminal replays rendered from the real run logs of the 2026-11-13 gate
+run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster; the run that
+verified the PR #63 review fixes) — each GIF carries the disclosure in
+its footer; regenerate with
+`GATE_LOG_DIR=<log dir> python3 scripts/schema/make_gifs.py`
+(Pillow pinned in `scripts/schema/requirements.txt`).
 
 - ![Migrations applied to a fresh database](gifs/01-migrations-fresh.gif)
 - ![Migrations rehearsed on the live-equivalent schema](gifs/02-migrations-live-rehearsal.gif)
-- ![Fixture assertions and the 384/1024 dimension test](gifs/03-fixtures-and-dimensions.gif)
+- ![Fixture assertions and the dimension test](gifs/03-fixtures-and-dimensions.gif)
 - ![Full test suite](gifs/04-test-suite.gif)
