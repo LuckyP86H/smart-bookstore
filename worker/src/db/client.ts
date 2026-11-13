@@ -10,7 +10,20 @@ import postgres from "postgres";
 import type { Env } from "../env";
 
 /** A single SQL parameter value. */
-export type QueryValue = string | number | bigint | boolean | Date | null;
+// Plain objects are admitted for jsonb columns (ai_runs input/output):
+// postgres.js serialises an object parameter to JSON itself, while a
+// pre-stringified JSON string is encoded AGAIN and lands in the column
+// as a JSON string scalar instead of an object — the double-encoding
+// the P4 gate work caught in ai_runs payloads. Pass objects, never
+// strings, for jsonb parameters through this seam.
+export type QueryValue =
+  | string
+  | number
+  | bigint
+  | boolean
+  | Date
+  | null
+  | Record<string, unknown>;
 
 /** One result row, keyed by column name (aliases in queries.ts apply). */
 export type QueryRow = Record<string, unknown>;

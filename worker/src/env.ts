@@ -13,6 +13,10 @@ export interface Env {
   // Route B: connection-pooled access to Supabase Postgres (wrangler.jsonc).
   HYPERDRIVE: Hyperdrive;
 
+  // Route B P4: Workers AI binding (wrangler.jsonc "ai"). The embedding
+  // model id is configuration, not code — see EMBEDDING_MODEL below.
+  AI: Ai;
+
   // Route B P2: login rate limiting binding (wrangler.jsonc "ratelimits").
   // Optional so local tests without the binding still typecheck and run.
   LOGIN_RATE_LIMITER?: RateLimit;
@@ -30,6 +34,11 @@ export interface Env {
   // Optional plain setting (wrangler.jsonc "vars"): PBKDF2 iteration target.
   // Resolved and clamped by auth/constants.ts; unset means the default there.
   PBKDF2_ITERATIONS?: string;
+
+  // Optional plain setting (wrangler.jsonc "vars"): Workers AI embedding
+  // model id for Route B P4 (plan §6 — model id lives in configuration,
+  // never hardcoded). worker/src/ai/embeddings.ts throws when unset.
+  EMBEDDING_MODEL?: string;
 
   // Secrets (Cloudflare dashboard → Settings → Variables and Secrets). Never commit these.
   DB_PASSWORD: string;
