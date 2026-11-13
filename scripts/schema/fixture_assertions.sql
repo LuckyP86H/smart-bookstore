@@ -4,11 +4,18 @@
 -- DB has no fixture data; schema-level checks for both DBs live in
 -- assertions.sql.) Same pattern as assertions.sql: a DO block raises on
 -- failure — the harness runs psql with ON_ERROR_STOP — and a SELECT
--- prints the PASS line. The two CHECK-rejection tests use an inner
+-- prints the PASS line. The CHECK-rejection tests use an inner
 -- exception block + a flag, so "the bad insert succeeded" is itself
 -- raised as a failure outside the handler that would swallow it; the
 -- whole DO is one statement, so a raised failure also rolls the bad
 -- insert back.
+--
+-- The Path A joins below compare isbn_index.isbn13 (char(13)) to
+-- books.isbn (varchar(20)) WITHOUT a cast on purpose: casting the raw
+-- listing isbn to char(13) raises on a longer raw value (the hyphenated
+-- '978-0-13-235088-4' is 17 chars), while the bare comparison simply
+-- does not match — the length-safe behaviour a join over raw listing
+-- data needs.
 
 -- 1. fixture row counts ---------------------------------------------------------
 
@@ -81,7 +88,7 @@ begin
   if not exists (
     select 1
     from public.books b
-    join public.isbn_index ii on ii.isbn13 = b.isbn::char(13)
+    join public.isbn_index ii on ii.isbn13 = b.isbn
     join public.ref_editions e on e.id = ii.edition_ref_id
     join public.ref_works w on w.id = e.work_ref_id
     where b.title = 'Effective Java'
@@ -97,7 +104,7 @@ select 'PASS: Path A control join resolves store A Effective Java -> Effective J
 
 select b.title as listing_title, e.title as edition_title, w.title as work_title
 from public.books b
-join public.isbn_index ii on ii.isbn13 = b.isbn::char(13)
+join public.isbn_index ii on ii.isbn13 = b.isbn
 join public.ref_editions e on e.id = ii.edition_ref_id
 join public.ref_works w on w.id = e.work_ref_id
 where b.store_id = (select id from public.stores where username = 'fixture-merchant-a')
@@ -113,7 +120,7 @@ begin
   if not exists (
     select 1
     from public.books b
-    join public.isbn_index ii on ii.isbn13 = b.isbn::char(13)
+    join public.isbn_index ii on ii.isbn13 = b.isbn
     join public.ref_editions e on e.id = ii.edition_ref_id
     join public.ref_works w on w.id = e.work_ref_id
     where b.title = 'Design Patterns'
@@ -128,7 +135,7 @@ select 'PASS: lying ISBN listing joins to the Effective Java edition (title mism
 
 select b.title as listing_title, e.title as edition_title, w.title as work_title
 from public.books b
-join public.isbn_index ii on ii.isbn13 = b.isbn::char(13)
+join public.isbn_index ii on ii.isbn13 = b.isbn
 join public.ref_editions e on e.id = ii.edition_ref_id
 join public.ref_works w on w.id = e.work_ref_id
 where b.title = 'Design Patterns';
@@ -206,3 +213,28 @@ end
 $$;
 
 select 'PASS: resolve_path_b task is claimable (status pending, run_after <= now())' as gate;
+
+-- 7. assertions CHECK: a record cannot be asserted against itself -----------------
+
+do $$
+declare
+  v_work bigint;
+  v_inserted boolean := false;
+begin
+  select id into v_work from public.ref_works
+    where source_key = 'fixture/effective-java';
+  begin
+    insert into public.assertions
+      (left_kind, right_kind, left_id, right_id, relation, level, asserted_by)
+    values ('ref_work', 'ref_work', v_work, v_work, 'same', 'work', 'gate-probe');
+    v_inserted := true;
+  exception when check_violation then
+    v_inserted := false;
+  end;
+  if v_inserted then
+    raise exception 'fixture_assertions: assertions insert pairing a record with itself unexpectedly succeeded';
+  end if;
+end
+$$;
+
+select 'PASS: assertions CHECK rejects a self-pair (same kind, same id)' as gate;

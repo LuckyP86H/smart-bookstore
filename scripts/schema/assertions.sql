@@ -41,7 +41,11 @@ $$;
 
 select 'PASS: all 17 new public tables exist' as gate;
 
--- 2. books.embedding is vector(1024) -----------------------------------------
+-- 2. books.embedding stays vector(384) -----------------------------------------
+-- The 384 -> 1024 switch is deferred to the P5 ai-service migration
+-- (see the header of 20261111130400_p4_ai_platform.sql): the live
+-- Python ai-service's contract is 384 dimensions, so this migration
+-- series must leave the column at 384.
 -- for a vector column, pg_attribute.atttypmod IS the dimension.
 
 do $$
@@ -51,13 +55,13 @@ begin
   select atttypmod into v_dim
   from pg_attribute
   where attrelid = 'public.books'::regclass and attname = 'embedding';
-  if v_dim is distinct from 1024 then
-    raise exception 'assertions: books.embedding dimension is %, expected 1024', v_dim;
+  if v_dim is distinct from 384 then
+    raise exception 'assertions: books.embedding dimension is %, expected 384 (switch deferred to P5)', v_dim;
   end if;
 end
 $$;
 
-select 'PASS: books.embedding is vector(1024) (atttypmod = 1024)' as gate;
+select 'PASS: books.embedding stays vector(384) (atttypmod = 384; 1024 switch deferred to P5)' as gate;
 
 -- 3. ref_works.embedding is halfvec(1024) -------------------------------------
 
@@ -76,7 +80,8 @@ $$;
 
 select 'PASS: ref_works.embedding is halfvec(1024) (atttypmod = 1024)' as gate;
 
--- 4. books gained categories, is_synthetic and the 4 provenance columns ------
+-- 4. books gained categories + is_synthetic — and NOT the embedding --------
+-- provenance columns, which arrive only with the deferred 1024 switch.
 
 do $$
 declare
@@ -85,12 +90,18 @@ begin
   select count(*) into v_count
   from information_schema.columns
   where table_schema = 'public' and table_name = 'books'
+    and column_name in ('categories', 'is_synthetic');
+  if v_count <> 2 then
+    raise exception 'assertions: books has % of the 2 expected new columns (categories, is_synthetic)', v_count;
+  end if;
+  select count(*) into v_count
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'books'
     and column_name in (
-      'categories', 'is_synthetic',
       'embedding_model', 'embedding_recipe', 'embedding_text_hash', 'embedded_at'
     );
-  if v_count <> 6 then
-    raise exception 'assertions: books has % of the 6 expected new columns', v_count;
+  if v_count <> 0 then
+    raise exception 'assertions: books has % embedding provenance columns; they belong to the deferred P5 switch and must not be here', v_count;
   end if;
   select count(*) into v_count
   from information_schema.columns
@@ -102,7 +113,7 @@ begin
 end
 $$;
 
-select 'PASS: books has categories + is_synthetic + 4 provenance columns; stores has is_synthetic' as gate;
+select 'PASS: books has categories + is_synthetic and no embedding provenance columns (deferred); stores has is_synthetic' as gate;
 
 -- 5. pg_trgm probe (§3.7): show_trgm on a 3-character Chinese title -----------
 
@@ -192,3 +203,47 @@ end
 $$;
 
 select 'PASS: listing_links.derivation_run_id FK exists; review_aspects_queue view exists' as gate;
+
+-- 9. ai_runs lifecycle + assertions column discipline ---------------------------
+-- ai_runs: status defaults to 'running', the CHECK admits 'running', and
+-- finished_at exists — a crashed run must read as unfinished, not 'ok'.
+-- assertions: left_kind / right_kind / relation / level are NOT NULL, so
+-- an id can never be left uninterpretable by a NULL kind.
+
+do $$
+declare
+  v_default text;
+  v_check text;
+  v_count integer;
+begin
+  select column_default into v_default
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'ai_runs' and column_name = 'status';
+  if v_default is null or v_default not like '%running%' then
+    raise exception 'assertions: ai_runs.status default is %, expected a ''running'' default', v_default;
+  end if;
+  select pg_get_constraintdef(oid) into v_check
+  from pg_constraint
+  where conrelid = 'public.ai_runs'::regclass and contype = 'c'
+    and pg_get_constraintdef(oid) like '%status%';
+  if v_check is null or v_check not like '%running%' then
+    raise exception 'assertions: ai_runs status CHECK does not admit ''running'': %', v_check;
+  end if;
+  select count(*) into v_count
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'ai_runs' and column_name = 'finished_at';
+  if v_count <> 1 then
+    raise exception 'assertions: ai_runs.finished_at is missing';
+  end if;
+  select count(*) into v_count
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'assertions'
+    and column_name in ('left_kind', 'right_kind', 'relation', 'level')
+    and is_nullable = 'NO';
+  if v_count <> 4 then
+    raise exception 'assertions: % of the 4 assertions kind/relation/level columns are NOT NULL, expected 4', v_count;
+  end if;
+end
+$$;
+
+select 'PASS: ai_runs starts ''running'' with finished_at present; assertions kind/relation/level are NOT NULL' as gate;

@@ -58,17 +58,29 @@ create table public.evidence (
 -- Assertions name stable record ids only (§3.6), never listings, so they
 -- never conflict with listing deletion. left_id / right_id are plain
 -- bigints on purpose: the kind columns say which table they belong to.
+-- The kind / relation / level columns are NOT NULL: a row whose kind is
+-- NULL leaves its id uninterpretable, which defeats the table's purpose.
+-- A record also cannot be asserted against itself: 'same' would be a
+-- tautology and 'not_same' a contradiction, so the pair must name two
+-- different records (same id under a DIFFERENT kind is a different
+-- record and stays legal). No uniqueness constraint on the pair:
+-- assertions are an append-only judgment log — the same pair may be
+-- re-asserted over time or by different people, and deduplication is
+-- the Step 5 consumer's concern, not the schema's.
 create table public.assertions (
   id bigint generated always as identity primary key,
-  left_kind text check (left_kind in ('ref_work', 'ref_edition', 'local_work')),
-  right_kind text check (right_kind in ('ref_work', 'ref_edition', 'local_work')),
+  left_kind text not null check (left_kind in ('ref_work', 'ref_edition', 'local_work')),
+  right_kind text not null check (right_kind in ('ref_work', 'ref_edition', 'local_work')),
   left_id bigint not null,
   right_id bigint not null,
-  relation text check (relation in ('same', 'not_same')),
-  level text check (level in ('work', 'edition')),
+  relation text not null check (relation in ('same', 'not_same')),
+  level text not null check (level in ('work', 'edition')),
   asserted_by text not null,
   reason text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint assertions_no_self_pair check (
+    not (left_kind = right_kind and left_id = right_id)
+  )
 );
 
 create table public.listing_links (

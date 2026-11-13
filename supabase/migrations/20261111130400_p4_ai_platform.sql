@@ -1,11 +1,22 @@
 -- 20261111130400_p4_ai_platform.sql
 -- P4 Step 2 (PR 2): the thin AI platform — prompt registry, ai_runs (the
 -- only observability record, D6: no Langfuse columns, no dual-write
--- hooks; created directly in its upgraded shape, D-R1), the books
--- embedding switch from vector(384) to vector(1024) with provenance
--- columns, and the review-aspects substrate for Act 3.
+-- hooks; created directly in its upgraded shape, D-R1), and the
+-- review-aspects substrate for Act 3.
 -- Implements P4-BOOKS-FINAL-PLAN.md §3.6 (ai_runs) and §4.3 (payload
 -- retention; bge-m3 is a 1024-dimension model).
+--
+-- DEFERRED, deliberately: the books.embedding switch from vector(384)
+-- to vector(1024) is NOT in this migration. The live Python ai-service
+-- still produces and queries 384-dimension vectors
+-- (ai-service/app/config/settings.py: embedding_dimension = 384,
+-- model all-MiniLM-L6-v2), and its semantic-search endpoint is live —
+-- switching the column here would break it silently. The switch (the
+-- column type change, its HNSW rebuild, and the embedding provenance
+-- columns) lands with the P5 change that retires/migrates the Python
+-- ai-service. The P4 reference catalogue is unaffected: ref_works is a
+-- new table with no legacy writer and stores halfvec(1024) from the
+-- start (20261111130000).
 
 create table public.prompts (
   id bigint generated always as identity primary key,
@@ -32,10 +43,15 @@ create table public.ai_runs (
   input_tokens integer,
   output_tokens integer,
   neurons numeric,
-  status text not null default 'ok' check (status in ('ok', 'error')),
+  -- lifecycle: a run starts 'running' (the default) and finishRun moves
+  -- it to exactly one terminal state, stamping finished_at. A worker
+  -- that dies mid-run leaves a 'running' row with finished_at NULL —
+  -- visibly unfinished, never a false 'ok'.
+  status text not null default 'running' check (status in ('running', 'ok', 'error')),
   error text,
   listing_id bigint references public.books(id) on delete set null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
 );
 
 -- The foreign key deferred from 20261111130200_p4_identity_store.sql:
@@ -45,16 +61,11 @@ alter table public.listing_links
   add constraint listing_links_derivation_run_id_fkey
   foreign key (derivation_run_id) references public.ai_runs(id) on delete set null;
 
--- books.embedding: 384 -> 1024 dimensions (D-R2: the column type is the
--- dimension assertion; a 384-dimension insert now fails loud). Existing
--- rows are not padded or re-embedded by this migration.
-drop index public.idx_books_embedding;
-alter table public.books alter column embedding type extensions.vector(1024);
-alter table public.books add column embedding_model text;
-alter table public.books add column embedding_recipe text;
-alter table public.books add column embedding_text_hash text;
-alter table public.books add column embedded_at timestamptz;
-create index idx_books_embedding on public.books using hnsw (embedding extensions.vector_cosine_ops);
+-- books.embedding stays vector(384) here — see the DEFERRED note in the
+-- file header. The column, its existing idx_books_embedding index, and
+-- the Go backend's vector(384) fallback in backend/db/database.go all
+-- stay mutually consistent until the P5 ai-service migration moves the
+-- whole contract to 1024 at once.
 
 create table public.review_aspects (
   id bigint generated always as identity primary key,

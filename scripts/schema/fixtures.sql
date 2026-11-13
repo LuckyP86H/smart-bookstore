@@ -182,34 +182,39 @@ insert into public.prompts (key, version, body, description) values
    'Fixture prompt for the P4 schema gate.');
 
 insert into public.ai_runs
-  (kind, provider, model, input, output, status, listing_id)
+  (kind, provider, model, input, output, status, listing_id, finished_at)
 select 'embedding', 'workers-ai', '@cf/baai/bge-m3',
   '{"texts": ["Effective Java by Joshua Bloch"]}'::jsonb,
   '{"dimensions": 1024, "vectors": 1}'::jsonb,
-  'ok', b.id
+  'ok', b.id, now()
 from public.books b
 where b.title = 'Effective Java'
   and b.store_id = (select id from public.stores where username = 'fixture-merchant-a');
 
 insert into public.ai_runs
-  (parent_run_id, kind, provider, model, input, output, status, listing_id)
+  (parent_run_id, kind, provider, model, input, output, status, listing_id, finished_at)
 select p.id, 'derive_listing_links', 'worker', null,
   '{"path": "a", "isbn13": "9780134685991"}'::jsonb,
   '{"link_status": "automatic"}'::jsonb,
-  'ok', b.id
+  'ok', b.id, now()
 from public.ai_runs p, public.books b
 where p.kind = 'embedding'
   and b.title = 'Effective Java'
   and b.store_id = (select id from public.stores where username = 'fixture-merchant-a');
 
 -- evidence: one auto-link, one rejection kept as negative lineage -----------------
+-- total_score reconciles with the stated weights: until the Step 5
+-- scoring formula lands, read a band as exact = 1 and mismatch = 0, so
+-- total = sum(weight x band): all-exact = 0.4 + 0.3 + 0.3 = 1.00, and
+-- the lying pair = 0.4 (isbn only). Both sit on the right side of the
+-- model version's thresholds (auto_link 0.9, propose 0.6).
 
 insert into public.evidence
   (listing_id, candidate_edition_id, bands, weights, total_score, model_version_id, outcome)
 select b.id, e.id,
   '{"isbn": "exact", "title": "exact", "author": "exact"}'::jsonb,
   '{"isbn": 0.4, "title": 0.3, "author": 0.3}'::jsonb,
-  0.98,
+  1.00,
   (select id from public.model_versions where name = 'pathb-fixture-0'),
   'auto_linked'
 from public.books b, public.ref_editions e
@@ -224,7 +229,7 @@ insert into public.evidence
 select b.id, e.id,
   '{"isbn": "exact", "title": "mismatch", "author": "mismatch"}'::jsonb,
   '{"isbn": 0.4, "title": 0.3, "author": 0.3}'::jsonb,
-  0.41,
+  0.40,
   (select id from public.model_versions where name = 'pathb-fixture-0'),
   'rejected'
 from public.books b, public.ref_editions e
@@ -232,16 +237,20 @@ where b.title = 'Design Patterns'
   and e.source_key = 'fixture/effective-java-edition-2018';
 
 -- assertions -----------------------------------------------------------------------
--- with exactly two distinct reference works in the fixture set, the only
--- 'same' pair available at work level is the Effective Java work paired
--- with itself; it exercises the assertion shape against real row ids.
+-- the two distinct reference works in the fixture set, asserted
+-- 'not_same' at work level by the owner. (An earlier draft paired the
+-- Effective Java work with itself; the schema now rejects self-pairs —
+-- a record asserted against itself carries no judgment — and a
+-- not_same pair between the two real works exercises the same shape
+-- with a meaningful claim.)
 
 insert into public.assertions
   (left_kind, right_kind, left_id, right_id, relation, level, asserted_by, reason)
-select 'ref_work', 'ref_work', w.id, w.id, 'same', 'work', 'owner',
-  'Fixture assertion: the owner confirms the identity of the Effective Java reference work.'
-from public.ref_works w
-where w.source_key = 'fixture/effective-java';
+select 'ref_work', 'ref_work', ej.id, hl.id, 'not_same', 'work', 'owner',
+  'Fixture assertion: the owner confirms Effective Java and 红楼梦 are different works.'
+from public.ref_works ej, public.ref_works hl
+where ej.source_key = 'fixture/effective-java'
+  and hl.source_key = 'fixture/hongloumeng';
 
 -- local work for the residue + listing links -----------------------------------------
 
