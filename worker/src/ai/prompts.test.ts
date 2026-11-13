@@ -58,4 +58,16 @@ describe("loadPrompt", () => {
       /no prompt found for key "no_such_prompt"/,
     );
   });
+
+  it("throws loud on a non-integer id instead of silently using 0", async () => {
+    // toInt previously returned 0 for unexpected types, which would
+    // hand back a prompt whose id names no row.
+    const { db } = stubDb([
+      { id: { bogus: true }, key: "summarise_listing", version: 3, body: "x" },
+    ]);
+
+    await expect(loadPrompt(db, "summarise_listing")).rejects.toThrow(
+      /unexpected integer value/,
+    );
+  });
 });

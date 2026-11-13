@@ -3,19 +3,24 @@
 // The embedding model id is configuration, never code: it is read from
 // the EMBEDDING_MODEL var (wrangler.jsonc) on every call, and this module
 // throws loud when it is missing instead of falling back to a hardcoded
-// model. What code *does* pin is the dimension: the schema stores
-// vector(1024) / halfvec(1024) (PR 2 migrations), so every vector the
-// model returns is asserted to be exactly EMBEDDING_DIMENSIONS long —
-// this assertion is the code-level replacement for the old 384-dim
-// assumption, and a model whose output disagrees fails here, at the
-// boundary, rather than at insert time deep inside a job.
+// model. What code *does* pin is the dimension: the P4 reference
+// columns this module feeds store halfvec(1024) (PR 2 migrations), so
+// every vector the model returns is asserted to be exactly
+// EMBEDDING_DIMENSIONS long, and a model whose output disagrees fails
+// here, at the boundary, rather than at insert time deep inside a job.
+// Scope note: the legacy books.embedding column is NOT one of those
+// columns — it stays vector(384), is owned by the Python ai-service,
+// and this module never writes it; its switch to 1024 is deferred to
+// the P5 ai-service migration (see 20261111130400's header).
 
 import type { Env } from "../env";
 
 /**
- * The one embedding dimension the P4 schema accepts. Every stored
- * embedding column is vector(1024) / halfvec(1024); a returned vector of
- * any other length is a configuration error (wrong EMBEDDING_MODEL).
+ * The embedding dimension of the P4 reference schema (ref_works stores
+ * halfvec(1024)). A returned vector of any other length is a
+ * configuration error (wrong EMBEDDING_MODEL). The legacy
+ * books.embedding column stays at 384 under the Python ai-service and
+ * is out of this module's scope — see the file header.
  */
 export const EMBEDDING_DIMENSIONS = 1024;
 

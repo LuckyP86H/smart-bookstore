@@ -15,12 +15,25 @@ export interface LoadedPrompt {
   body: string;
 }
 
-/** postgres.js returns ints as number|string|bigint; normalise. */
+/**
+ * postgres.js returns ints as number|string|bigint; normalise. Any
+ * other shape is a programming/driver error and throws loud — silently
+ * returning 0 (the previous behaviour) would hand the caller a prompt
+ * id or version that names no row.
+ */
 function toInt(value: unknown): number {
-  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
   if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string") return Math.trunc(Number(value));
-  return 0;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  throw new Error(
+    `loadPrompt: unexpected integer value ${String(value)} ` +
+      `(type ${typeof value}) in a prompts row`,
+  );
 }
 
 function toText(value: unknown): string {
