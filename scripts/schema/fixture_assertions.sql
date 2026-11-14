@@ -154,6 +154,13 @@ begin
     where source_key = 'fixture/effective-java-edition-2018';
   select id into v_work from public.ref_works
     where source_key = 'fixture/effective-java';
+  -- Guard (PR #63 review round 2): a missed lookup leaves NULLs, and a
+  -- probe insert with zero candidate columns violates the CHECK for the
+  -- wrong reason — the probe would PASS while testing nothing. Fail
+  -- loud on a missing fixture instead.
+  if v_listing is null or v_edition is null or v_work is null then
+    raise exception 'fixture_assertions: evidence probe fixture lookup missed (listing=%, edition=%, work=%)', v_listing, v_edition, v_work;
+  end if;
   begin
     insert into public.evidence
       (listing_id, candidate_edition_id, candidate_work_id, bands, outcome)
@@ -183,6 +190,13 @@ begin
   select id into v_edition from public.ref_editions
     where source_key = 'fixture/effective-java-edition-2018';
   select id into v_local from public.local_works where title = '红楼梦';
+  -- Guard (PR #63 review round 2): same false-pass shape as the
+  -- evidence probe above — if the '红楼梦' lookup misses, v_local is
+  -- NULL and the inserted row's shape violates the CHECK without the
+  -- probe ever exercising the two-target case. Fail loud instead.
+  if v_listing is null or v_edition is null or v_local is null then
+    raise exception 'fixture_assertions: listing_links probe fixture lookup missed (listing=%, edition=%, local_work=%)', v_listing, v_edition, v_local;
+  end if;
   begin
     insert into public.listing_links
       (listing_id, edition_ref_id, local_work_id, status)
@@ -223,6 +237,11 @@ declare
 begin
   select id into v_work from public.ref_works
     where source_key = 'fixture/effective-java';
+  -- Guard (PR #63 review round 2): same pattern as the probes above —
+  -- never let a missed fixture lookup decide what this probe tests.
+  if v_work is null then
+    raise exception 'fixture_assertions: assertions probe fixture lookup missed (work=%)', v_work;
+  end if;
   begin
     insert into public.assertions
       (left_kind, right_kind, left_id, right_id, relation, level, asserted_by)
