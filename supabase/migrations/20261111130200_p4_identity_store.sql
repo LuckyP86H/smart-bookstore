@@ -120,15 +120,26 @@ create table public.identity_events (
   created_at timestamptz not null default now()
 );
 
+-- The task table is the queue of record (plan §5): a task row is written
+-- in the same transaction as the listing it concerns. Workers claim rows
+-- with FOR UPDATE SKIP LOCKED; locked_until is the visibility timeout
+-- (a claimed row reappears once it passes); priority is how "resolve
+-- the fast sellers first" is said — as data (trailing sales velocity),
+-- and the sweep claims ORDER BY priority. Status vocabulary: 'failed'
+-- is the terminal state (plan §5: terminal failed + last_error is the
+-- dead-letter list); 'dead' remains in the CHECK for vocabulary
+-- compatibility but no producer writes it.
 create table public.tasks (
   id bigint generated always as identity primary key,
   kind text not null,
   listing_id bigint references public.books(id) on delete set null,
   payload jsonb not null default '{}',
   status text default 'pending' check (status in ('pending', 'claimed', 'done', 'failed', 'dead')),
+  priority integer not null default 0,
   attempts integer not null default 0,
   claimed_by text,
   claimed_at timestamptz,
+  locked_until timestamptz,
   run_after timestamptz not null default now(),
   last_error text,
   created_at timestamptz not null default now(),

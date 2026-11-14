@@ -247,3 +247,38 @@ end
 $$;
 
 select 'PASS: ai_runs starts ''running'' with finished_at present; assertions kind/relation/level are NOT NULL' as gate;
+
+-- 10. tasks carries the plan §5 claim columns --------------------------------
+-- priority (integer, NOT NULL, default 0) is how "resolve the fast
+-- sellers first" is said — the sweep claims ORDER BY priority.
+-- locked_until (timestamptz, nullable) is the claim visibility timeout:
+-- NULL while unclaimed, set when a worker claims the row.
+
+do $$
+declare
+  v_type text;
+  v_nullable text;
+  v_default text;
+begin
+  select data_type, is_nullable, column_default into v_type, v_nullable, v_default
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'tasks' and column_name = 'priority';
+  if v_type is null then
+    raise exception 'assertions: tasks.priority is missing (plan §5)';
+  end if;
+  if v_type <> 'integer' or v_nullable <> 'NO' or v_default is null or v_default not like '0%' then
+    raise exception 'assertions: tasks.priority is % nullable=% default=%, expected integer NOT NULL default 0', v_type, v_nullable, v_default;
+  end if;
+  select data_type, is_nullable into v_type, v_nullable
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'tasks' and column_name = 'locked_until';
+  if v_type is null then
+    raise exception 'assertions: tasks.locked_until is missing (plan §5)';
+  end if;
+  if v_type <> 'timestamp with time zone' or v_nullable <> 'YES' then
+    raise exception 'assertions: tasks.locked_until is % nullable=%, expected timestamptz (nullable)', v_type, v_nullable;
+  end if;
+end
+$$;
+
+select 'PASS: tasks has priority (integer, NOT NULL, default 0) and locked_until (timestamptz, nullable) — plan §5' as gate;
