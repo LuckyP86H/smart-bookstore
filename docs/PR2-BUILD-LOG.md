@@ -20,6 +20,17 @@ Governing spec: `P4-BOOKS-FINAL-PLAN.md` §2, §3.6, §6, §9 Step 2, §12, §15
   (`database.go` ALTER … vector(384)) still say 384 — they are the container
   stack that stays until P5 (decision 12) and the Go parity surface frozen
   at P3 (§12 item 8), so PR 2 does not touch them. Flagged in the report.
+  **Correction (2026-11-13, PR #63 review round 1; confirmed round 2,
+  2026-11-14): this decision was reversed before merge.** The 384→1024
+  switch is DEFERRED to P5, when the Python ai-service retires: migration
+  20261111130400 no longer touches `books.embedding`, which stays
+  `vector(384)`, and the gate now proves the opposite of the sentence
+  above — a 384-dim insert SUCCEEDS and a 1024-dim insert fails with
+  pgvector's dimension error. The live ai-service contract (384 in,
+  384 out) is the reason: switching the column under it would have
+  broken semantic search the moment the migration was applied. The
+  Python/Go 384 references above are therefore not stale leftovers;
+  they are the contract the deferral protects.
 - **D-R3 — Scratch Postgres = local apt PostgreSQL 16 + pgvector**, one
   instance, shut down after the gate. No Docker exists in the VM; the repo's
   vitest suite is stub-based and never opens a DB, so the gate harness is
@@ -150,6 +161,14 @@ Migration files (forward-only, repo naming convention, ordered):
      timestamptz, run_after timestamptz not null default now(),
      last_error text, created_at/updated_at. Index (status, run_after).
      NO Queue objects anywhere — this table is the Act 1 job mechanism.
+     **Correction (2026-11-14, review round 2): two plan §5 columns were
+     missing from this contract and from the migration** — `priority
+     integer not null default 0` (the sweep claims `ORDER BY priority`)
+     and `locked_until timestamptz` (the claim visibility timeout).
+     Both are now in migration 20261111130200, with gate assertions.
+     The migration also gained a comment clarifying the status
+     vocabulary: 'failed' is the terminal state (§5's dead-letter);
+     'dead' stays in the CHECK but no producer writes it.
 4. `20261111130300_p4_works_projection.sql`
    - `works`: work_ref_id → ref_works unique nullable, local_work_id →
      local_works unique nullable, CHECK exactly one non-null; title text
@@ -167,6 +186,13 @@ Migration files (forward-only, repo naming convention, ordered):
      payload retention is a job (prune payloads after 90 days, §4.3), not
      a schema property. (D6: this table is the only observability record —
      no Langfuse columns, no dual-write hooks.)
+     **Correction (2026-11-13, review round 1): the shipped status shape
+     is a lifecycle, not the two-state contract above** — status defaults
+     to `'running'`, the CHECK admits `('running','ok','error')`, and a
+     `finished_at timestamptz` column records completion, so a crashed
+     run reads as unfinished instead of 'ok'. `runs.ts` stamps
+     `finished_at` in `finishRun`, which refuses to finish a run that is
+     not still 'running'.
    - FK from file 3: `alter table listing_links add constraint …
      foreign key (derivation_run_id) references ai_runs(id) on delete
      set null` (column itself declared in file 3 without the FK).
@@ -175,6 +201,14 @@ Migration files (forward-only, repo naming convention, ordered):
      columns embedding_model/recipe/text_hash text, embedded_at
      timestamptz; recreate `idx_books_embedding` hnsw
      (embedding extensions.vector_cosine_ops).
+     **Correction (2026-11-13, review round 1): NOT shipped.** The whole
+     switch — type change, provenance columns, HNSW rebuild — is deferred
+     to P5 (see the D-R2 correction above). Migration 20261111130400 as
+     merged-bound creates only `prompts`, `ai_runs`, `review_aspects`
+     (+ view) and the deferred listing_links FK; the gate asserts
+     `books.embedding` stays at dimension 384 and that the provenance
+     columns are ABSENT from books (they exist only on `ref_works`,
+     from file 1, where they were always planned).
    - `review_aspects`: review_id → reviews cascade, unique (review_id);
      aspects jsonb; status text not null default 'pending' CHECK in
      ('pending','extracted','failed'); model text; created_at/updated_at.
@@ -213,6 +247,11 @@ Migration files (forward-only, repo naming convention, ordered):
    fixtures → assertions, including: Path A control join resolves;
    1024-dim insert succeeds; **384-dim insert fails** (script asserts
    the failure).
+   **Correction (2026-11-13, review round 1): reversed with the
+   deferral** — the shipped dimension test proves a 384-dim insert
+   succeeds and a 1024-dim insert fails, and the harness grew to 8
+   steps (it also captures the vitest run to npm-test.log and records
+   each migration apply's exit code separately).
 3. Harness re-run is a no-op (D-R5).
 4. `npm test` (full suite) + `npm run typecheck` green; new total
    reported against the 123 baseline.
@@ -251,6 +290,17 @@ Migration files (forward-only, repo naming convention, ordered):
   `resolve_path_b` task is claimable; **384-dim insert fails with
   `ERROR: expected 1024 dimensions, not 384`, 1024-dim insert
   succeeds.**
+  **Correction (2026-11-13, review round 1; extended 2026-11-14,
+  round 2): the paragraph above is the pre-review run record and its
+  dimension claims are reversed in the shipped branch.** After the
+  deferral the gate is 8/8 steps; `books.embedding` atttypmod = 384;
+  a 384-dim insert succeeds and a 1024-dim insert fails with pgvector's
+  `expected 384 dimensions, not 1024`. Round 1 also changed the
+  assertions self-pair fixture (see the Child A correction below) and
+  the ai_runs lifecycle. Round 2 (2026-11-14) adds the plan §5
+  `tasks.priority` / `tasks.locked_until` columns with gate assertions
+  for both, and fail-loud fixture-lookup guards on the
+  fixture_assertions.sql rejection probes (§4, §5, §7).
 - **§3.7 probe, measured:** `extensions.show_trgm('红楼梦')` returns
   exactly **4 trigrams** — the plan's quantitative claim ("a 3-character
   title yields ~4 trigrams") confirmed on the rehearsal DB (locale
@@ -259,6 +309,10 @@ Migration files (forward-only, repo naming convention, ordered):
   12 new ai/ tests), iteration-literal guard clean; `npm run typecheck`
   green. wrangler.jsonc diff is +9/−1 (ai binding + EMBEDDING_MODEL var
   + comments); containers/durable_objects/exports byte-identical.
+  **Correction (2026-11-13, review round 1): the suite is now 140/140**
+  — round 1 added 5 tests for the ai_runs lifecycle and the payload
+  pass-through (and updated 2 tests that had encoded the old
+  stringified-payload contract). Typecheck still green.
 - **GIFs:** `scripts/schema/gifs/01…04` (0.09–0.20 MB), PIL-rendered
   from the real gate/test logs by `scripts/schema/make_gifs.py`,
   disclosure footer on every frame, linked from `scripts/schema/README.md`
@@ -283,6 +337,12 @@ Files produced:
   error by id; status defaults `ok`, flips to `error` when an error is
   given without an explicit status). Column names match the SQL contract
   exactly.
+  (Correction 2026-11-13, review round 1: `startRun` no longer
+  serialises the input — payloads pass through as values, see the jsonb
+  bullet below — and leaves status to the DB default `'running'`;
+  `finishRun` also stamps `finished_at` and only updates a row still in
+  'running', throwing otherwise. The 'ok'/'error' outcome semantics of
+  finishRun are unchanged.)
 - `worker/src/ai/prompts.ts` — `loadPrompt(db, key)`: highest-version row
   (`ORDER BY version DESC LIMIT 1`), throws loud naming the key when absent.
 - Tests: `embeddings.test.ts` (4), `runs.test.ts` (6), `prompts.test.ts`
@@ -299,6 +359,9 @@ Files produced:
 Results: `npm run typecheck` green; `npx vitest run worker/src/ai` =
 12/12; full `npm test` also run as a sanity check = 135/135 (123 baseline
 + 12 new), iteration-literal guard clean.
+(Correction 2026-11-13, review round 1: full suite is 140/140 after the
+ai_runs lifecycle + payload pass-through tests; see the Run record
+correction above.)
 
 Judgment calls (with reasons):
 
@@ -310,9 +373,15 @@ Judgment calls (with reasons):
   The contract says only "updates it"; this mirrors queries.ts
   (`updateStock`/`deleteBook` fail loud on a missing row) so finishing a
   run that was never started cannot fail silently. Covered by a test.
-- jsonb payloads (`input`/`output`) are `JSON.stringify`-serialised and
-  absent/null stores SQL NULL; Postgres casts the text parameter to
-  jsonb from context, consistent with the repo's `$n` style.
+- jsonb payloads (`input`/`output`) are passed through as values —
+  postgres.js serialises them to jsonb itself; absent/null stores SQL
+  NULL. A sanitiser keeps the JSONB contract total: BigInt → string,
+  circular references → `"[Circular]"`, non-finite numbers → NULL.
+  **Corrected 2026-11-14 (review round 2): this bullet originally said
+  the payloads are `JSON.stringify`-serialised by runs.ts. That was the
+  double-encoding bug PR 3's gate later caught in real rows (payloads
+  landed as JSON strings, not objects); review round 1 (2026-11-13)
+  removed the stringify and made payloads pass through as values.**
 - Id-shaped fields (`promptId`, `parentRunId`, `listingId`) accept
   `number | bigint` (listing ids are bigint elsewhere in the codebase);
   `startRun` returns `number`, normalising postgres.js's
@@ -348,6 +417,10 @@ Migrations in `supabase/migrations/`:
   listing_links.derivation_run_id FK, the books embedding switch to
   vector(1024) + 4 provenance columns, review_aspects +
   review_aspects_queue view.
+  (Correction 2026-11-13, review round 1: the embedding switch and the
+  4 books provenance columns are NOT in the shipped file — deferred to
+  P5; see the D-R2 correction. The file creates prompts, ai_runs,
+  review_aspects + the view, and the listing_links FK.)
 
 Gate harness in `scripts/schema/`: `scaffolding.sql`,
 `run_gate.sh` (executable), `fixtures.sql`, `assertions.sql`,
@@ -369,6 +442,10 @@ Judgment calls beyond the contract, with reasons:
   books and ref_works (the contract's "embedding_model/recipe/
   text_hash" shorthand, expanded symmetrically; these are the "4
   provenance columns" assertions.sql checks on books).
+  (Correction 2026-11-13, review round 1: the four columns exist only
+  on ref_works. On books they were part of the deferred switch and
+  were removed with it; assertions.sql now asserts their ABSENCE from
+  books.)
 - **All three fixture stores and all fixture listings are flagged
   is_synthetic.** The task phrase "one store flagged is_synthetic"
   was read against D-R9 ("fixture stores are equally synthetic"):
@@ -384,6 +461,12 @@ Judgment calls beyond the contract, with reasons:
   distinct ref works, so no non-degenerate 'same' pair exists; the
   row exercises the assertion shape against real row ids and says so
   in fixtures.sql.
+  (Correction 2026-11-13, review round 1: superseded. Round 1 added a
+  self-pair CHECK to `assertions`, so the self-pairing fixture row
+  would now be rejected by the schema it feeds. The fixture instead
+  pairs the two distinct ref works as 'not_same', and
+  fixture_assertions.sql §7 probes that a true self-pair insert is
+  rejected.)
 - **ISBN-10 → ISBN-13 facet conversion computed and verified:**
   '080442957x' → 9780804429573 (978 + first 9 digits + recomputed
   check digit 3). Both contracted ISBN-13s verified checksum-valid.
