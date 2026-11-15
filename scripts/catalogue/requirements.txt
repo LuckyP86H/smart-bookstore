@@ -1,0 +1,11 @@
+# Pinned dependencies for the catalogue pipeline (PR 1, Step 1).
+# These are the exact versions the PR 1 build ran with — create the
+# data venv with:
+#   python3 -m venv $DATA_DIR/venv
+#   $DATA_DIR/venv/bin/pip install -r scripts/catalogue/requirements.txt
+duckdb==2.0.0
+pyarrow==26.0.1
+# Pillow is only used by make_gifs.py (GIF replays); PR 1 rendered with
+# the system python's Pillow 10.2.0. Pin it here so a fresh venv can
+# render too.
+Pillow==10.2.0
