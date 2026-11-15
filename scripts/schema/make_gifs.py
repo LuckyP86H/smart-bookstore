@@ -10,8 +10,8 @@ Usage:
         python3 scripts/schema/make_gifs.py
 
 Inputs (from GATE_LOG_DIR): fresh-setup.log, live-setup.log,
-assertions-live.log, fixture-assertions.log, dimensions.log, gate.log,
-npm-test.log. Output: scripts/schema/gifs/*.gif
+assertions-fresh.log, assertions-live.log, fixture-assertions.log,
+dimensions.log, gate.log, npm-test.log. Output: scripts/schema/gifs/*.gif
 """
 
 import os
@@ -183,19 +183,25 @@ def main() -> int:
 
     fresh = read(log_dir, "fresh-setup.log")
     live = read(log_dir, "live-setup.log")
+    assertions_fresh = read(log_dir, "assertions-fresh.log")
     assertions_live = read(log_dir, "assertions-live.log")
     fixture_assertions = read(log_dir, "fixture-assertions.log")
     dimensions = read(log_dir, "dimensions.log")
     gate = read(log_dir, "gate.log")
     npm_test = read(log_dir, "npm-test.log")
 
+    # The assertions count is read from the run's own log, never
+    # hardcoded: a literal here went stale when assertions.sql grew a
+    # tenth section in PR #63 review round 2 (the GIF kept printing
+    # 9/9; round 3 caught it).
+    n_assertions_fresh = len([ln for ln in assertions_fresh if "PASS:" in ln])
     applying_fresh = pick(fresh, lambda ln: ln.startswith("applying") or "scaffolding" in ln)
     render(
         "$ scripts/schema/run_gate.sh   # fresh database",
         ["# sb_p4_fresh: scaffolding + all 8 migrations, in filename order"]
         + applying_fresh
         + pick(gate, lambda ln: "prepare sb_p4_fresh" in ln and "PASS" in ln)
-        + ["# assertions.sql on sb_p4_fresh: 9/9 PASS (see 02 for the list)"],
+        + [f"# assertions.sql on sb_p4_fresh: {n_assertions_fresh}/{n_assertions_fresh} PASS (see 02 for the list)"],
         os.path.join(out_dir, "01-migrations-fresh.gif"),
     )
 

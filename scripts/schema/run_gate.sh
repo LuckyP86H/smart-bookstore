@@ -196,6 +196,12 @@ dimension_test() { # dimension_test <db> <logfile>
   # still ACCEPT a 384-dimension vector and REJECT a 1024-dimension
   # one. (Before the deferral this test asserted the exact opposite.)
   local db="$1" log="$2" out code rc=0
+  # This log is truncated, not appended: the summary's PASS-line count
+  # is computed over it, and appending made a second run into the same
+  # log directory report the first run's lines again (31 instead of 29;
+  # found in PR #63 review round 3). The other per-run logs are
+  # truncated by run_sql_gate for the same reason.
+  : > "$log"
   echo "=== dimension test on $db ===" >> "$log"
   out=$(psql_db "$db" -v ON_ERROR_STOP=1 -qc \
     "insert into public.books (store_id, title, author, genre, price, embedding)
