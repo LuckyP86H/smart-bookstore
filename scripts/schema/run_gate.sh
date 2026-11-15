@@ -25,8 +25,10 @@
 # Migration tracking mirrors Supabase (D-R5): each DB keeps a
 # p4_gate.applied_migrations table and every file is applied exactly
 # once. A second run against the same server finds the tracked state
-# complete, applies nothing, prints NO-OP, and only re-runs the
-# read-only assertions. A database that exists but is INCOMPLETE (an
+# complete, applies nothing, and prints NO-OP for the prepare steps;
+# the assertions, the dimension test and the vitest suite still
+# re-run (the dimension test writes and deletes its probe row).
+# A database that exists but is INCOMPLETE (an
 # interrupted earlier run) is dropped and recreated, so a gate run
 # always starts from a deterministic state; GATE_FRESH=1 forces that
 # drop+recreate even for a complete database.
@@ -199,8 +201,10 @@ dimension_test() { # dimension_test <db> <logfile>
   # This log is truncated, not appended: the summary's PASS-line count
   # is computed over it, and appending made a second run into the same
   # log directory report the first run's lines again (31 instead of 29;
-  # found in PR #63 review round 3). The other per-run logs are
-  # truncated by run_sql_gate for the same reason.
+  # found in PR #63 review round 3). The assertion logs are truncated
+  # by run_sql_gate's `>` redirect, and gate.log / fresh-setup.log /
+  # live-setup.log / noop-rerun.log are truncated at the start of
+  # main, for the same reason (round 4).
   : > "$log"
   echo "=== dimension test on $db ===" >> "$log"
   out=$(psql_db "$db" -v ON_ERROR_STOP=1 -qc \
@@ -240,6 +244,21 @@ run_sql_gate() { # run_sql_gate <name> <db> <file> <logfile>
 }
 
 # ---------------------------------------------------------------- main ------
+
+# Every per-run log starts EMPTY. The logs written by append (note(),
+# prepare_db, apply_migrations) are truncated here, before the first
+# write; dimensions.log is truncated inside dimension_test, and the
+# assertion / npm-test logs are truncated by their writers' `>`
+# redirects. Nothing in the log directory may carry lines across
+# runs: the summary's PASS count is computed over these files, and
+# make_gifs.py's pick() takes the FIRST matching lines — with
+# append-mode setup logs, a re-run's GIFs silently showed the first
+# run's prepare lines (PR #63 review round 4; dimensions.log alone
+# was fixed in round 3, the other four logs are closed here).
+: > "$LOG_DIR/gate.log"
+: > "$LOG_DIR/fresh-setup.log"
+: > "$LOG_DIR/live-setup.log"
+: > "$LOG_DIR/noop-rerun.log"
 
 note "=== P4 schema gate — $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
 note "migrations dir: $MIGRATIONS_DIR ($(migration_files | wc -l) files)"

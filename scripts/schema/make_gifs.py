@@ -193,15 +193,23 @@ def main() -> int:
     # The assertions count is read from the run's own log, never
     # hardcoded: a literal here went stale when assertions.sql grew a
     # tenth section in PR #63 review round 2 (the GIF kept printing
-    # 9/9; round 3 caught it).
+    # 9/9; round 3 caught it). The fraction's DENOMINATOR comes from
+    # assertions.sql itself — one `select 'PASS:` line per section —
+    # so a partial run renders as a partial fraction (round 4: with
+    # both sides read from the log, the fraction could only ever
+    # read n/n and a short run was invisible).
     n_assertions_fresh = len([ln for ln in assertions_fresh if "PASS:" in ln])
+    assertions_sql = read(os.path.dirname(os.path.abspath(__file__)), "assertions.sql")
+    n_assertions_total = len(
+        [ln for ln in assertions_sql if ln.startswith("select 'PASS:")]
+    )
     applying_fresh = pick(fresh, lambda ln: ln.startswith("applying") or "scaffolding" in ln)
     render(
         "$ scripts/schema/run_gate.sh   # fresh database",
         ["# sb_p4_fresh: scaffolding + all 8 migrations, in filename order"]
         + applying_fresh
         + pick(gate, lambda ln: "prepare sb_p4_fresh" in ln and "PASS" in ln)
-        + [f"# assertions.sql on sb_p4_fresh: {n_assertions_fresh}/{n_assertions_fresh} PASS (see 02 for the list)"],
+        + [f"# assertions.sql on sb_p4_fresh: {n_assertions_fresh}/{n_assertions_total} PASS (see 02 for the list)"],
         os.path.join(out_dir, "01-migrations-fresh.gif"),
     )
 

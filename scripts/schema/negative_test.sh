@@ -114,8 +114,15 @@ psql_db "$DB" -v ON_ERROR_STOP=1 -f "$WORK/variant-a.sql" \
 A_RC=$?
 [ "$A_RC" -ne 0 ] \
   || fail "variant A (guarded, lookups mutated) unexpectedly exited 0"
-grep -q 'evidence probe fixture lookup missed' "$WORK/a.out" \
-  || fail "variant A failed, but not with the guard's message — see $WORK/a.out (kept on failure only if run manually)"
+if ! grep -q 'evidence probe fixture lookup missed' "$WORK/a.out"; then
+  # The EXIT trap deletes $WORK on the way out — including on this
+  # failure — so the output is shown here rather than referenced by
+  # a path that will not exist when the message is read.
+  echo "--- variant A output ---"
+  cat "$WORK/a.out"
+  echo "--- end variant A output ---"
+  fail "variant A failed, but not with the guard's message"
+fi
 echo "variant A: guard fired as expected (psql exit $A_RC, 'evidence probe fixture lookup missed')"
 
 # --- variant B: the false pass must reproduce -----------------------------------
