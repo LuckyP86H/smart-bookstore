@@ -3,6 +3,7 @@ import { createCustomerClient, isMerchantUser } from './api/client';
 import { Book, Genre } from './gen/bookstore_pb';
 import { CartItem } from './types/book';
 import BookCard from './components/BookCard';
+import WorkPage from './components/WorkPage';
 import Cart from './components/Cart';
 import FilterPanel from './components/FilterPanel';
 import ThemeToggle from './components/ThemeToggle';
@@ -63,6 +64,8 @@ function App() {
     error: string | null;
   } | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  // The listing whose work page is open, if any (P4 §8 click-through).
+  const [workBookId, setWorkBookId] = useState<bigint | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
   const [username, setUsername] = useState(savedSession?.username ?? '');
@@ -192,6 +195,7 @@ function App() {
     setIsMerchant(false);
     setBooksResult(null);
     setCart([]);
+    setWorkBookId(null);
     setPendingSession(null); // Clear pending session
     // Clear session from localStorage
     clearSession();
@@ -370,35 +374,46 @@ function App() {
         />
 
         <div className="content-area">
-          <div className="books-section">
-            <h2>Available Books ({books.length})</h2>
-            
-            {loading && <p>Loading books...</p>}
-            {error && <p className="error">{error}</p>}
-            
-            <div className="books-grid">
-              {books.map((book) => (
-                <BookCard
-                  key={book.id.toString()}
-                  book={book}
-                  onBuyNow={handleBuyNow}
-                  onAddToCart={addToCart}
-                  cartQuantity={getCartQuantity(book.id)}
-                />
-              ))}
-            </div>
-            
-            {!loading && books.length === 0 && (
-              <p className="no-books">No books found. Try adjusting your filters.</p>
-            )}
-          </div>
+          {workBookId !== null && customerClient ? (
+            <WorkPage
+              client={customerClient}
+              bookId={workBookId}
+              onBack={() => setWorkBookId(null)}
+            />
+          ) : (
+            <>
+              <div className="books-section">
+                <h2>Available Books ({books.length})</h2>
 
-          <Cart
-            items={cart}
-            onUpdateQuantity={updateCartQuantity}
-            onRemove={removeFromCart}
-            onCheckout={handleCheckout}
-          />
+                {loading && <p>Loading books...</p>}
+                {error && <p className="error">{error}</p>}
+
+                <div className="books-grid">
+                  {books.map((book) => (
+                    <BookCard
+                      key={book.id.toString()}
+                      book={book}
+                      onBuyNow={handleBuyNow}
+                      onAddToCart={addToCart}
+                      cartQuantity={getCartQuantity(book.id)}
+                      onShowWork={(book) => setWorkBookId(book.id)}
+                    />
+                  ))}
+                </div>
+
+                {!loading && books.length === 0 && (
+                  <p className="no-books">No books found. Try adjusting your filters.</p>
+                )}
+              </div>
+
+              <Cart
+                items={cart}
+                onUpdateQuantity={updateCartQuantity}
+                onRemove={removeFromCart}
+                onCheckout={handleCheckout}
+              />
+            </>
+          )}
         </div>
       </div>
 
