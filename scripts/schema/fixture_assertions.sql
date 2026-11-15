@@ -214,13 +214,18 @@ $$;
 select 'PASS: listing_links CHECK rejects a row with both local_work_id and edition_ref_id' as gate;
 
 -- 6. the Path B task is claimable ----------------------------------------------------------
--- The claimable predicate is the plan §5 claim WHERE clause: pending,
--- run_after due, and not locked (locked_until NULL or already past).
--- The fixture task (locked_until NULL) must match it; the probes below
--- pin the other two directions — a future-locked task and a
--- future-dated task must NOT match, a past-locked one must. (Before
--- PR #63 review round 4 the probe ignored locked_until entirely, so
--- a future-locked task "passed" as claimable.)
+-- The claimable predicate is derived from plan §5's claim semantics,
+-- not quoted from it: §5 gives the claim mechanism (the sweep claims
+-- pending rows with FOR UPDATE SKIP LOCKED, in priority order, and
+-- locked_until is the visibility timeout) but never writes a WHERE
+-- clause. Spelled out as a predicate, a task is claimable when it is
+-- pending, its run_after is due, and it is not locked (locked_until
+-- NULL or already past). The fixture task (locked_until NULL) must
+-- match it; the probes below pin the other two directions — a
+-- future-locked task and a future-dated task must NOT match, a
+-- past-locked one must. (Before PR #63 review round 4 the probe
+-- ignored locked_until entirely, so a future-locked task "passed" as
+-- claimable.)
 
 do $$
 declare
@@ -304,18 +309,52 @@ select 'PASS: assertions CHECK rejects a self-pair (same kind, same id)' as gate
 
 -- 8. updated_at actually advances on UPDATE (D-R11 behavioural proof) ------------
 -- assertions.sql §11 asserts the trigger wiring exists; this section
--- proves the behaviour end to end on two of the six tables (tasks,
--- local_works): insert a probe row, update it in a LATER transaction,
--- and require updated_at to have moved past created_at. The probes
--- are three separate statements on purpose — now() is the
--- transaction timestamp, so insert and update must not share one —
--- with a pg_sleep between them for margin. Probes are deleted at
--- the end; a failed assertion leaves them behind for debugging.
+-- proves the behaviour end to end on all six tables that carry the
+-- trigger (listing_facets, local_works, listing_links, tasks, works,
+-- review_aspects): update a probe row in a LATER transaction and
+-- require updated_at to have moved past created_at. Two tables get
+-- fresh probe rows (tasks, local_works); the other four reuse their
+-- fixture rows — the Effective Java listing's facets and link, its
+-- works projection row, and its review's aspects row. The probes are
+-- separate statements on purpose — now() is the transaction
+-- timestamp, so insert and update must not share one — with a
+-- pg_sleep between them for margin. The per-table update and check
+-- statements run as data-driven loops over (table, statement) pairs
+-- so the six tables cannot drift apart. Inserted probe rows are
+-- deleted at the end; a failed assertion leaves them behind for
+-- debugging.
 
 do $$
+declare
+  v_facets bigint;
+  v_link bigint;
+  v_work bigint;
+  v_aspects bigint;
 begin
   insert into public.tasks (kind, status) values ('gate_probe_updated_at', 'pending');
   insert into public.local_works (title) values ('gate probe updated_at');
+  -- The four reused fixture rows, resolved by natural key. Guarded
+  -- like every other probe lookup in this file: a missed lookup must
+  -- fail loud here, never silently shrink what the probe exercises.
+  select listing_id into v_facets from public.listing_facets
+  where title_key = 'effective java';
+  select id into v_link from public.listing_links
+  where listing_id = (select id from public.books
+                      where title = 'Effective Java'
+                        and store_id = (select id from public.stores
+                                        where username = 'fixture-merchant-a'));
+  select id into v_work from public.works
+  where work_ref_id = (select id from public.ref_works
+                       where source_key = 'fixture/effective-java');
+  select id into v_aspects from public.review_aspects
+  where review_id = (select r.id from public.reviews r
+                     join public.books b on b.id = r.book_id
+                     where b.title = 'Effective Java'
+                       and b.store_id = (select id from public.stores
+                                          where username = 'fixture-merchant-a'));
+  if v_facets is null or v_link is null or v_work is null or v_aspects is null then
+    raise exception 'fixture_assertions: updated_at probe fixture lookup missed (facets=%, link=%, work=%, aspects=%)', v_facets, v_link, v_work, v_aspects;
+  end if;
 end
 $$;
 
@@ -323,48 +362,70 @@ select pg_sleep(0.05);
 
 do $$
 declare
+  probe record;
   v_rows integer;
 begin
-  update public.tasks set attempts = attempts + 1 where kind = 'gate_probe_updated_at';
-  get diagnostics v_rows = row_count;
-  if v_rows <> 1 then
-    raise exception 'fixture_assertions: updated_at probe task missing (update hit % rows)', v_rows;
-  end if;
-  update public.local_works set title = title where title = 'gate probe updated_at';
-  get diagnostics v_rows = row_count;
-  if v_rows <> 1 then
-    raise exception 'fixture_assertions: updated_at probe local_work missing (update hit % rows)', v_rows;
-  end if;
+  for probe in
+    select * from (values
+      ('tasks',
+       $u$update public.tasks set attempts = attempts + 1 where kind = 'gate_probe_updated_at'$u$),
+      ('local_works',
+       $u$update public.local_works set title = title where title = 'gate probe updated_at'$u$),
+      ('listing_facets',
+       $u$update public.listing_facets set title_key = title_key where title_key = 'effective java'$u$),
+      ('listing_links',
+       $u$update public.listing_links set status = status where listing_id = (select id from public.books where title = 'Effective Java' and store_id = (select id from public.stores where username = 'fixture-merchant-a'))$u$),
+      ('works',
+       $u$update public.works set title = title where work_ref_id = (select id from public.ref_works where source_key = 'fixture/effective-java')$u$),
+      ('review_aspects',
+       $u$update public.review_aspects set status = status where review_id = (select r.id from public.reviews r join public.books b on b.id = r.book_id where b.title = 'Effective Java' and b.store_id = (select id from public.stores where username = 'fixture-merchant-a'))$u$)
+    ) as p(label, stmt)
+  loop
+    execute probe.stmt;
+    get diagnostics v_rows = row_count;
+    if v_rows <> 1 then
+      raise exception 'fixture_assertions: updated_at probe update on % hit % rows (expected 1)', probe.label, v_rows;
+    end if;
+  end loop;
 end
 $$;
 
 do $$
 declare
+  probe record;
   v_created timestamptz;
   v_updated timestamptz;
 begin
-  select created_at, updated_at into v_created, v_updated
-  from public.tasks where kind = 'gate_probe_updated_at';
-  if v_created is null then
-    raise exception 'fixture_assertions: updated_at probe task vanished before the check';
-  end if;
-  if not (v_updated > v_created) then
-    raise exception 'fixture_assertions: tasks.updated_at did not advance on UPDATE (created %, updated %)', v_created, v_updated;
-  end if;
-  select created_at, updated_at into v_created, v_updated
-  from public.local_works where title = 'gate probe updated_at';
-  if v_created is null then
-    raise exception 'fixture_assertions: updated_at probe local_work vanished before the check';
-  end if;
-  if not (v_updated > v_created) then
-    raise exception 'fixture_assertions: local_works.updated_at did not advance on UPDATE (created %, updated %)', v_created, v_updated;
-  end if;
+  for probe in
+    select * from (values
+      ('tasks',
+       $q$select created_at, updated_at from public.tasks where kind = 'gate_probe_updated_at'$q$),
+      ('local_works',
+       $q$select created_at, updated_at from public.local_works where title = 'gate probe updated_at'$q$),
+      ('listing_facets',
+       $q$select created_at, updated_at from public.listing_facets where title_key = 'effective java'$q$),
+      ('listing_links',
+       $q$select created_at, updated_at from public.listing_links where listing_id = (select id from public.books where title = 'Effective Java' and store_id = (select id from public.stores where username = 'fixture-merchant-a'))$q$),
+      ('works',
+       $q$select created_at, updated_at from public.works where work_ref_id = (select id from public.ref_works where source_key = 'fixture/effective-java')$q$),
+      ('review_aspects',
+       $q$select created_at, updated_at from public.review_aspects where review_id = (select r.id from public.reviews r join public.books b on b.id = r.book_id where b.title = 'Effective Java' and b.store_id = (select id from public.stores where username = 'fixture-merchant-a'))$q$)
+    ) as p(label, stmt)
+  loop
+    execute probe.stmt into v_created, v_updated;
+    if v_created is null then
+      raise exception 'fixture_assertions: updated_at probe row for % not found', probe.label;
+    end if;
+    if not (v_updated > v_created) then
+      raise exception 'fixture_assertions: %.updated_at did not advance on UPDATE (created %, updated %)', probe.label, v_created, v_updated;
+    end if;
+  end loop;
   delete from public.tasks where kind = 'gate_probe_updated_at';
   delete from public.local_works where title = 'gate probe updated_at';
 end
 $$;
 
-select 'PASS: updated_at advances past created_at on UPDATE (tasks, local_works — D-R11 trigger behaviour)' as gate;
+select 'PASS: updated_at advances past created_at on UPDATE (all six triggered tables: listing_facets, local_works, listing_links, tasks, works, review_aspects — D-R11 trigger behaviour)' as gate;
 
 -- 9. works CHECK: exactly one source ------------------------------------------------
 -- Both directions, like §6: a projection row naming BOTH a reference
