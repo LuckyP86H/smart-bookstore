@@ -8,6 +8,20 @@ the repo's vitest suite never opens a database); the same script also
 runs `npm test` once at the end and captures it to `npm-test.log`, so
 every log the GIF renderer consumes comes from one harness run.
 
+## At a glance: what PR 2 adds
+
+| Piece | What it is |
+|---|---|
+| Reference catalogue | `ref_works`, `ref_editions`, `ref_authors` + `ref_author_aliases`, and the slice-scoped `isbn_index` — the Open Library spine the identity engine matches listings against, with provenance on every row and a 1024-dimension embedding on each work |
+| Identity store | `listing_facets` (each listing's match tokens — ISBN, title/author keys, format, language — kept as fields) plus `evidence`, `assertions`, `listing_links`, `identity_events`, `local_works`, `tasks` and `model_versions` — how a listing earns its link to a work: scored evidence, recorded assertions, the link and its event receipt, residue local works, and the database-backed task queue Path B claims from |
+| Works projection | `works` — one display row per book, sourced from exactly one of a reference work or a local work, never both and never neither |
+| AI platform | `prompts`, `ai_runs`, `review_aspects` + the `review_aspects_queue` view — the prompt registry, the ledger every AI call is recorded in, and the substrate for review-aspect extraction |
+| Worker `ai/` skeleton | `worker/src/ai/` (embeddings, runs, prompts) — the runtime side of the AI platform: bge-m3 embeddings through the Workers AI binding, `ai_runs` recording, and prompt loading that fails loud on a missing key |
+| Gate harness | `scripts/schema/` — `run_gate.sh`, the assertions, the fixtures and the negative test: the 8-step rehearsal that proves the migration series applies cleanly and behaves before it is applied anywhere real |
+
+The verification story for all six pieces is told by the replay GIFs
+under [Watch it run](#watch-it-run-replays) below.
+
 ## Files
 
 | File | What it is |
@@ -118,7 +132,7 @@ nothing accumulates across runs.
 
 Terminal replays rendered from the real run logs of the 2026-11-15 gate
 run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster; the PR #63
-review round-4 run — 8/8 steps, 33 individual PASS lines) — each GIF
+pre-merge nit-pass run — 8/8 steps, 33 individual PASS lines) — each GIF
 carries the disclosure in its footer; regenerate with
 `GATE_LOG_DIR=<log dir> python3 scripts/schema/make_gifs.py`
 (Pillow pinned in `scripts/schema/requirements.txt`).

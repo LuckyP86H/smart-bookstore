@@ -451,6 +451,35 @@ Migration files (forward-only, repo naming convention, ordered):
   PASS, vitest 140/140, typecheck green. Scratch environment
   rebuilt again after a VM restart (same recipe: PostgreSQL 16.15,
   pgvector 0.8.0 from source, `/tmp/pg2-scratch` port 54329).
+- **Pre-merge nit pass (2026-11-15, after Lily's approval at
+  `44156e2d`).** The two trivial follow-ups in her approval body plus
+  her README suggestion, addressed before merge at the owner's
+  request. (1) The §6 claimable comment no longer calls the predicate
+  "the plan §5 claim WHERE clause": §5 gives the claim mechanism
+  (pending rows claimed with FOR UPDATE SKIP LOCKED, in priority
+  order, `locked_until` as the visibility timeout) but never writes
+  the clause, so the comment now says the predicate is derived from
+  those semantics. The round-4 entry above ("applies the full §5
+  claim predicate") overstates the plan the same way and stands
+  corrected by this note. (2) The §8 `updated_at` behaviour probe now
+  exercises all six triggered tables, not two: `tasks` and
+  `local_works` keep fresh probe rows, the other four reuse their
+  fixture rows, and the update/check steps run as data-driven loops
+  over (table, statement) pairs so the six cannot drift apart; §11's
+  wiring assertions are unchanged. Proven to bite: on a pristine
+  fixture DB with the `works` trigger dropped, the probe fails loud
+  naming `works` — a table that previously rested on §11 alone.
+  (3) `scripts/schema/README.md` gained an "At a glance" section
+  (six pieces, one line each; her sketch corrected where it lumped
+  `listing_facets` into the reference catalogue — it is the identity
+  store's listing-side input, its own migration — and omitted
+  `ref_editions` / `ref_authors`). Executed this pass: gate from
+  scratch 8/8 steps / 33 PASS lines (the §8 extension still emits one
+  PASS line, so the arithmetic is unchanged), cold re-run 8/8 / 33,
+  `negative_test.sh` PASS, vitest 140/140, typecheck green; GIFs
+  regenerated from this pass's fresh run. Scratch environment rebuilt
+  again after a VM restart (PostgreSQL 16.15, pgvector 0.8.0 from
+  source, `/tmp/pg2-scratch` port 54329).
 - Scratch cluster shut down after the gate (D-R3).
 
 ## Child B — Worker half (`worker/src/ai/` + env/wrangler wiring)
