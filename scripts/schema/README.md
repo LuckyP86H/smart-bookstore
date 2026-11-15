@@ -13,10 +13,14 @@ every log the GIF renderer consumes comes from one harness run.
 | File | What it is |
 |---|---|
 | `run_gate.sh` | The harness. Creates the two scratch DBs, applies scaffolding + migrations + fixtures, runs the assertions and the dimension test, writes logs, prints a PASS/FAIL summary. |
+| `negative_test.sh` | The guards-bite proof for the `fixture_assertions.sql` rejection probes: builds its own throwaway fixture DB, then shows a mutated §4 probe failing loud with the guard in place and false-passing with the guard stripped. |
 | `scaffolding.sql` | **Environment replication, not a migration** — see the honesty note below. |
-| `fixtures.sql` | Synthetic gate data for the live-equivalent DB only (snapshot `fixture-2026-11-11`): two merchant stores + one customer store, listings covering the same-ISBN pair / lying ISBN, hyphen-variant and lowercase-x ISBN-10 variants, a NULL-ISBN 红楼梦， one sold listing, plus the reference catalogue, facets, evidence, assertions, links, task, prompts, ai_runs, works projection and review-aspects rows. Everything is flagged `is_synthetic`. |
+| `fixtures.sql` | Synthetic gate data for the live-equivalent DB only (snapshot `fixture-2026-11-11`): two merchant stores + one customer store, listings covering the same-ISBN pair / lying ISBN, hyphen-variant and lowercase-x ISBN-10 variants, a NULL-ISBN 红楼梦， one sold listing, plus the reference catalogue, facets, evidence, assertions, links, task, prompts, ai_runs, works projection and review-aspects rows. Every store and listing is flagged `is_synthetic`. |
 | `assertions.sql` | Schema-level assertions (DO blocks that raise on failure, `PASS …` selects on success). No fixture dependency, so it runs against **both** DBs. |
 | `fixture_assertions.sql` | Data assertions: fixture row counts, the Path A control join, the lying-ISBN join, the three CHECK-rejection probes (evidence candidates, listing-link target shape, assertion self-pair), task claimability. Live-equivalent DB only. |
+| `make_gifs.py` | Renders the replay GIFs below from a gate run's logs (Pillow pinned in `requirements.txt`). Counts shown in the GIFs are read from the logs, never hardcoded. |
+| `gifs/` | The four replay GIFs linked at the bottom of this README. |
+| `README.md` | This file. |
 
 ## The D-R4 scaffolding honesty note
 
@@ -65,8 +69,10 @@ migration files run verbatim, exactly as they run on Supabase.
    DB keeps a `p4_gate.applied_migrations` table and every file is
    applied exactly once. Re-running the apply step prints `NO-OP` and
    changes nothing; re-running the whole harness against a complete
-   pair of DBs likewise applies nothing and only re-runs the read-only
-   assertions. A DB that exists but is *incomplete* (an interrupted
+   pair of DBs likewise applies nothing — the assertions and the
+   dimension test re-run (the dimension test is not read-only: it
+   inserts its 384-dimension probe row and deletes it again), and
+   `npm test` re-runs as well. A DB that exists but is *incomplete* (an interrupted
    run) is dropped and recreated so the run starts deterministically;
    `GATE_FRESH=1` forces that drop+recreate even for a complete DB.
    (The fixed DB names, rather than per-run suffixed names, are what
@@ -94,6 +100,10 @@ GATE_LOG_DIR=/tmp/p4-gate-logs scripts/schema/run_gate.sh
 
 # force a from-scratch rehearsal even if a previous run completed:
 GATE_FRESH=1 scripts/schema/run_gate.sh
+
+# prove the rejection-probe guards bite (own throwaway DB, same
+# connection conventions):
+scripts/schema/negative_test.sh
 ```
 
 Exit code is 0 only when every gate step passes. Per-step output lands
@@ -104,10 +114,10 @@ in the log directory: `fresh-setup.log`, `live-setup.log`,
 
 ## Watch it run (replays)
 
-Terminal replays rendered from the real run logs of the 2026-11-13 gate
-run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster; the run that
-verified the PR #63 review fixes) — each GIF carries the disclosure in
-its footer; regenerate with
+Terminal replays rendered from the real run logs of the 2026-11-15 gate
+run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster; the PR #63
+review round-3 run — 8/8 steps, 29 individual PASS lines) — each GIF
+carries the disclosure in its footer; regenerate with
 `GATE_LOG_DIR=<log dir> python3 scripts/schema/make_gifs.py`
 (Pillow pinned in `scripts/schema/requirements.txt`).
 

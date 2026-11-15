@@ -37,13 +37,18 @@ Governing spec: `P4-BOOKS-FINAL-PLAN.md` §2, §3.6, §6, §9 Step 2, §12, §15
   bash + psql under `scripts/schema/`. If the distro pgvector is < 0.7
   (no `halfvec`), build pgvector 0.8.x from source against the distro
   server-dev headers. (Outcome recorded below.)
-- **D-R4 — Supabase scaffolding for rehearsal.** Vanilla Postgres lacks two
-  things Supabase pre-provides and the existing migrations assume: the
-  `extensions` schema (migration 1 does `create extension … with schema
-  extensions`) and `public.rls_auto_enable()` (migrations 2–3 revoke
-  execute on it). The harness creates both as *environment scaffolding*
-  before applying any repo migration, and says so in its output. This
-  replicates Supabase, it is not part of any migration file.
+- **D-R4 — Supabase scaffolding for rehearsal.** Vanilla Postgres lacks
+  three things Supabase pre-provides and the existing migrations assume:
+  the `extensions` schema (migration 1 does `create extension … with
+  schema extensions`), `public.rls_auto_enable()` (migrations 2–3
+  revoke execute on it), and the `anon` / `authenticated` roles (the
+  same revoke statements name them). The harness creates all three as
+  *environment scaffolding* before applying any repo migration, and
+  says so in its output. This replicates Supabase, it is not part of
+  any migration file.
+  (Correction 2026-11-15, review round 3: this paragraph originally
+  counted two. The roles were always created by `scaffolding.sql` and
+  disclosed in the Child A section below; only the count here was off.)
 - **D-R5 — Migration tracking mirrors Supabase.** The harness keeps a
   `p4_gate.applied_migrations` table and applies each file exactly once;
   a second harness run is a no-op (that is the idempotency the repo's
@@ -132,11 +137,17 @@ Migration files (forward-only, repo naming convention, ordered):
      null; weights jsonb; total_score numeric; model_version_id →
      model_versions; outcome text CHECK in
      ('auto_linked','proposed','rejected'); created_at.
-   - `assertions`: left_kind/right_kind text CHECK in
+   - `assertions`: left_kind/right_kind text not null CHECK in
      ('ref_work','ref_edition','local_work'), left_id/right_id bigint not
-     null, relation text CHECK in ('same','not_same'), level text CHECK
-     in ('work','edition'), asserted_by text not null, reason text,
-     created_at. Index on (left_kind, left_id, right_kind, right_id).
+     null, relation text not null CHECK in ('same','not_same'), level
+     text not null CHECK in ('work','edition'), asserted_by text not
+     null, reason text, created_at. Index on (left_kind, left_id,
+     right_kind, right_id).
+     (Correction 2026-11-15, review round 3: the four kind/relation/
+     level columns were always NOT NULL in the shipped migration —
+     assertions.sql §9 asserts it, and this round re-confirmed it with
+     live NULL-insert probes against the gate DB, all rejected. Only
+     this contract line omitted the NOT NULLs.)
    - `local_works`: title text, created_from text not null default
      'residue', variant_of_ref_work_id → ref_works (the §3.3 abridgement
      variant-under-same-reference-work mechanism).
@@ -273,6 +284,10 @@ Migration files (forward-only, repo naming convention, ordered):
   + 12 tests (full suite sanity 135/135, typecheck green); `env.ts` gained
   `AI` + `EMBEDDING_MODEL`; wrangler.jsonc gained the `ai` binding + var,
   containers verified untouched.
+  (Correction 2026-11-15, review round 3: as-built counts. Round 1's
+  lifecycle / pass-through tests brought the ai/ total to 17 and the
+  full suite to 140/140 — see the Child B section's corrected per-file
+  counts below; re-verified by running vitest at the round-3 head.)
 - **Child A (SQL) complete:** 5 migrations (17 new tables), harness +
   fixtures + assertions under `scripts/schema/`. Its flagged catch: the
   contract said "13 new tables" in one sentence but listed 17 — the 17
@@ -301,6 +316,14 @@ Migration files (forward-only, repo naming convention, ordered):
   `tasks.priority` / `tasks.locked_until` columns with gate assertions
   for both, and fail-loud fixture-lookup guards on the
   fixture_assertions.sql rejection probes (§4, §5, §7).
+  **Round 3 addendum (2026-11-15): the individual PASS-line count is
+  29** — assertions.sql's 10 PASS lines × 2 DBs + fixture_assertions'
+  7 + the dimension test's 2; the "24 PASS lines" in the paragraph
+  above is the pre-review count. Re-running the gate into the same log
+  directory exposed a reporting wart: `dimensions.log` was appended
+  to, so a second run double-counted the dimension lines (31).
+  `run_gate.sh` now truncates that log per run, and a cold re-run
+  reports the same 29 (verified this round, from scratch and cold).
 - **§3.7 probe, measured:** `extensions.show_trgm('红楼梦')` returns
   exactly **4 trigrams** — the plan's quantitative claim ("a 3-character
   title yields ~4 trigrams") confirmed on the rehearsal DB (locale
@@ -313,11 +336,27 @@ Migration files (forward-only, repo naming convention, ordered):
   — round 1 added 5 tests for the ai_runs lifecycle and the payload
   pass-through (and updated 2 tests that had encoded the old
   stringified-payload contract). Typecheck still green.
-- **GIFs:** `scripts/schema/gifs/01…04` (0.09–0.20 MB), PIL-rendered
+- **GIFs:** `scripts/schema/gifs/01…04` (0.09–0.23 MB), PIL-rendered
   from the real gate/test logs by `scripts/schema/make_gifs.py`,
   disclosure footer on every frame, linked from `scripts/schema/README.md`
   ("Watch it run (replays)"). Final frames visually QC'd (CJK renders via
   Noto Sans CJK).
+  (Regenerated 2026-11-15, review round 3, from that day's gate run:
+  the previous renderings were the round-1 run and showed 27 PASS
+  lines / 9 assertion sections. `make_gifs.py` no longer hardcodes
+  the assertions count — it reads it from the run's
+  `assertions-fresh.log`.)
+- **Round 3 (2026-11-15, PR #63 review): full claim audit of this
+  log.** Every count in this log was re-verified by execution at head
+  `a9d679a2`: vitest 140/140 (ai/ 17), typecheck green, gate from
+  scratch 8/8 steps with 29 PASS lines, cold re-run identical. The
+  round-2 mutated-fixture negative test is now a repo script
+  (`scripts/schema/negative_test.sh`), so the guard proof is
+  re-runnable: with the §4 lookups mutated, the guarded file fails
+  loud (psql exit 3, guard message) and the guard-stripped variant
+  exits 0 printing the false PASS line. Scratch environment rebuilt
+  again after a VM restart (PostgreSQL 16.15, pgvector 0.8.0 built
+  from source, cluster `/tmp/pg2-scratch` port 54329).
 - Scratch cluster shut down after the gate (D-R3).
 
 ## Child B — Worker half (`worker/src/ai/` + env/wrangler wiring)
@@ -345,8 +384,8 @@ Files produced:
   finishRun are unchanged.)
 - `worker/src/ai/prompts.ts` — `loadPrompt(db, key)`: highest-version row
   (`ORDER BY version DESC LIMIT 1`), throws loud naming the key when absent.
-- Tests: `embeddings.test.ts` (4), `runs.test.ts` (6), `prompts.test.ts`
-  (2) — repo stub style (stub Db capturing `(text, values)`, stub AI in
+- Tests: `embeddings.test.ts` (4), `runs.test.ts` (10), `prompts.test.ts`
+  (3) — repo stub style (stub Db capturing `(text, values)`, stub AI in
   the documented `{ shape, data }` shape), including the 384-length
   rejection, count-mismatch, and unset-`EMBEDDING_MODEL` cases.
 - `worker/src/env.ts` — added `AI: Ai;` (Route B P4 comment) and
@@ -357,11 +396,15 @@ Files produced:
   exports sections untouched (verified by parse + diff).
 
 Results: `npm run typecheck` green; `npx vitest run worker/src/ai` =
-12/12; full `npm test` also run as a sanity check = 135/135 (123 baseline
+17/17; full `npm test` also run as a sanity check = 135/135 (123 baseline
 + 12 new), iteration-literal guard clean.
 (Correction 2026-11-13, review round 1: full suite is 140/140 after the
 ai_runs lifecycle + payload pass-through tests; see the Run record
-correction above.)
+correction above. Correction 2026-11-15, review round 3: the ai/ total
+above originally read 12/12 and the per-file counts in the Tests line
+read runs (6) / prompts (2) — those were the as-built Child B numbers;
+round 1's added tests brought them to runs 10 / prompts 3 / ai/ 17,
+verified by running vitest at the round-3 head.)
 
 Judgment calls (with reasons):
 
