@@ -60,6 +60,11 @@ message Book {
   double average_rating = 16;
   string created_at = 17;
   string store_name = 18;
+  // Route B P4 (additive): synthetic-fixture disclosure (plan §4.4). True
+  // for seed/demo listings; the UI labels them instead of presenting them
+  // as real inventory. The Go backend predates the flag and leaves it
+  // false — a documented divergence, like GetWork below.
+  bool is_synthetic = 19;
 }
 
 message Review {
@@ -229,6 +234,90 @@ message GetPurchaseHistoryResponse {
 }
 
 // ============================================================================
+// Work Pages (Route B P4, plan §8 — Worker-only)
+//
+// GetWork is the identity layer's first read surface. It is implemented
+// ONLY by the Cloudflare Worker: Go parity stays frozen at the P3
+// surface (plan §12 decision 8), so the Go backend does not serve this
+// RPC and its generated stubs must never be called. The divergence is
+// recorded in DEPLOY.md.
+// ============================================================================
+
+message GetWorkRequest {
+  // Identify the work by one of its listings (the frontend only ever
+  // holds listing ids) or by the projection work id directly. book_id
+  // wins when both are set.
+  int64 book_id = 1;
+  int64 work_id = 2;
+}
+
+// One store's offer of the work (a member listing, via listing_links).
+message WorkOffer {
+  int64 listing_id = 1;
+  int64 store_id = 2;
+  string store_name = 3;
+  string isbn = 4;
+  double price = 5;
+  int32 stock_quantity = 6;
+  double average_rating = 7;
+  int32 total_sold = 8;
+  // The ref_editions id this listing is linked to (0 when the link is
+  // work-only or the work is local).
+  int64 edition_id = 9;
+  bool is_synthetic = 10;
+}
+
+// One published form of the work, from the reference catalogue.
+message WorkEdition {
+  int64 edition_id = 1;
+  string title = 2;
+  string publisher = 3;
+  int32 publish_year = 4;
+  string language = 5;
+  int32 page_count = 6;
+  string isbn13 = 7;
+}
+
+// A review of one member listing, rolled up onto the work (§8: reviews
+// roll up through current membership). The Review message names the
+// reviewer; the fields here add the listing it was written about, the
+// store selling that listing, and the edition the listing is linked to
+// — so "great translation" and "bad printing" stay distinguishable.
+message WorkReview {
+  Review review = 1;
+  int64 listing_id = 2;
+  string store_name = 3;
+  int64 edition_id = 4;
+}
+
+message GetWorkResponse {
+  // The projection row id (works.id).
+  int64 work_id = 1;
+  // Exactly one of these is set: the reference work, or the local work
+  // for residue listings.
+  int64 work_ref_id = 2;
+  int64 local_work_id = 3;
+  string title = 4;
+  string author_display = 5;
+  repeated string categories = 6;
+  string summary_en = 7;
+  string summary_zh = 8;
+  repeated WorkOffer offers = 9;
+  repeated WorkEdition editions = 10;
+  repeated WorkReview reviews = 11;
+  // Aggregates with exact denominators (§8): review_count is the number
+  // of member reviews mean_rating averages over; the price spread is
+  // over all member offers (0/0 when there are none).
+  int32 review_count = 12;
+  double mean_rating = 13;
+  double min_price = 14;
+  double max_price = 15;
+  // True when any member listing is a synthetic fixture — the page must
+  // disclose demo data (§4.4), never present it as real social proof.
+  bool has_synthetic_listings = 16;
+}
+
+// ============================================================================
 // Google Books API Integration
 // ============================================================================
 
@@ -245,6 +334,17 @@ message LookupBookByISBNResponse {
   string description = 6;
   string cover_image_url = 7;
   repeated string categories = 8;
+  // Route B P4 (additive), the §4.6 data rule made visible to the form:
+  // which source produced this prefill — "local_index", "open_library" or
+  // "google_books" — plus the attribution line to show next to it. When
+  // the source is Google Books, the description and cover are TRANSIENT:
+  // the form may display them with attribution but must not submit them
+  // to AddBook (Google APIs Terms §5(e) forbids persisting them). The
+  // *_transient flags say exactly that, per field.
+  string source = 9;
+  string attribution = 10;
+  bool description_transient = 11;
+  bool cover_transient = 12;
 }
 
 // ============================================================================
@@ -282,4 +382,8 @@ service CustomerService {
   
   // Purchase History
   rpc GetPurchaseHistory(GetPurchaseHistoryRequest) returns (GetPurchaseHistoryResponse);
+
+  // Work Pages (Route B P4, plan §8). Worker-only: the Go backend does
+  // not implement this RPC (Go parity is frozen at the P3 surface).
+  rpc GetWork(GetWorkRequest) returns (GetWorkResponse);
 }

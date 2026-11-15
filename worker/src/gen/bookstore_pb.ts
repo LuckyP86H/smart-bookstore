@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file bookstore.proto.
  */
 export const file_bookstore: GenFile = /*@__PURE__*/
-  fileDesc("Cg9ib29rc3RvcmUucHJvdG8SDGJvb2tzdG9yZS52MSLxAgoEQm9vaxIKCgJpZBgBIAEoAxIQCghzdG9yZV9pZBgCIAEoAxIMCgRpc2JuGAMgASgJEg0KBXRpdGxlGAQgASgJEg4KBmF1dGhvchgFIAEoCRIiCgVnZW5yZRgGIAEoDjITLmJvb2tzdG9yZS52MS5HZW5yZRIRCglwdWJsaXNoZXIYByABKAkSGAoQcHVibGljYXRpb25feWVhchgIIAEoBRISCgpwYWdlX2NvdW50GAkgASgFEhAKCGxhbmd1YWdlGAogASgJEhcKD2NvdmVyX2ltYWdlX3VybBgLIAEoCRITCgtkZXNjcmlwdGlvbhgMIAEoCRINCgVwcmljZRgNIAEoARIWCg5zdG9ja19xdWFudGl0eRgOIAEoBRISCgp0b3RhbF9zb2xkGA8gASgFEhYKDmF2ZXJhZ2VfcmF0aW5nGBAgASgBEhIKCmNyZWF0ZWRfYXQYESABKAkSEgoKc3RvcmVfbmFtZRgSIAEoCSKKAQoGUmV2aWV3EgoKAmlkGAEgASgDEg8KB2Jvb2tfaWQYAiABKAMSEwoLY3VzdG9tZXJfaWQYAyABKAMSFQoNY3VzdG9tZXJfbmFtZRgEIAEoCRIOCgZyYXRpbmcYBSABKAUSEwoLcmV2aWV3X3RleHQYBiABKAkSEgoKY3JlYXRlZF9hdBgHIAEoCSKmAQoEU2FsZRIKCgJpZBgBIAEoAxIPCgdib29rX2lkGAIgASgDEhIKCmJvb2tfdGl0bGUYAyABKAkSEwoLY3VzdG9tZXJfaWQYBCABKAMSFQoNY3VzdG9tZXJfbmFtZRgFIAEoCRIQCghxdWFudGl0eRgGIAEoBRIZChFwcmljZV9hdF9wdXJjaGFzZRgHIAEoARIUCgxwdXJjaGFzZWRfYXQYCCABKAkiiQIKDkFkZEJvb2tSZXF1ZXN0EgwKBGlzYm4YASABKAkSDQoFdGl0bGUYAiABKAkSDgoGYXV0aG9yGAMgASgJEiIKBWdlbnJlGAQgASgOMhMuYm9va3N0b3JlLnYxLkdlbnJlEhEKCXB1Ymxpc2hlchgFIAEoCRIYChBwdWJsaWNhdGlvbl95ZWFyGAYgASgFEhIKCnBhZ2VfY291bnQYByABKAUSEAoIbGFuZ3VhZ2UYCCABKAkSFwoPY292ZXJfaW1hZ2VfdXJsGAkgASgJEhMKC2Rlc2NyaXB0aW9uGAogASgJEg0KBXByaWNlGAsgASgBEhYKDnN0b2NrX3F1YW50aXR5GAwgASgFIjMKD0FkZEJvb2tSZXNwb25zZRIgCgRib29rGAEgASgLMhIuYm9va3N0b3JlLnYxLkJvb2siJAoRUmVtb3ZlQm9va1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAyIlChJSZW1vdmVCb29rUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCSI+ChJVcGRhdGVTdG9ja1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAxIXCg9xdWFudGl0eV90b19hZGQYAiABKAUiNwoTVXBkYXRlU3RvY2tSZXNwb25zZRIgCgRib29rGAEgASgLMhIuYm9va3N0b3JlLnYxLkJvb2siMwoXR2V0TWVyY2hhbnRCb29rc1JlcXVlc3QSGAoQaW5jbHVkZV9zb2xkX291dBgBIAEoCCI9ChhHZXRNZXJjaGFudEJvb2tzUmVzcG9uc2USIQoFYm9va3MYASADKAsyEi5ib29rc3RvcmUudjEuQm9vayI7ChNHZXRTb2xkQm9va3NSZXF1ZXN0EhIKCnN0YXJ0X2RhdGUYASABKAkSEAoIZW5kX2RhdGUYAiABKAkiOQoUR2V0U29sZEJvb2tzUmVzcG9uc2USIQoFc2FsZXMYASADKAsyEi5ib29rc3RvcmUudjEuU2FsZSIsChdHZXRMb3dTdG9ja0Jvb2tzUmVxdWVzdBIRCgl0aHJlc2hvbGQYASABKAUiPQoYR2V0TG93U3RvY2tCb29rc1Jlc3BvbnNlEiEKBWJvb2tzGAEgAygLMhIuYm9va3N0b3JlLnYxLkJvb2si5gEKGEdldEF2YWlsYWJsZUJvb2tzUmVxdWVzdBIUCgxzZWFyY2hfcXVlcnkYASABKAkSKQoMZ2VucmVfZmlsdGVyGAIgASgOMhMuYm9va3N0b3JlLnYxLkdlbnJlEhUKDWF1dGhvcl9maWx0ZXIYAyABKAkSEQoJbWluX3ByaWNlGAQgASgBEhEKCW1heF9wcmljZRgFIAEoARIrCgpzb3J0X29yZGVyGAYgASgOMhcuYm9va3N0b3JlLnYxLlNvcnRPcmRlchIMCgRwYWdlGAcgASgFEhEKCXBhZ2Vfc2l6ZRgIIAEoBSJ0ChlHZXRBdmFpbGFibGVCb29rc1Jlc3BvbnNlEiEKBWJvb2tzGAEgAygLMhIuYm9va3N0b3JlLnYxLkJvb2sSEwoLdG90YWxfY291bnQYAiABKAUSDAoEcGFnZRgDIAEoBRIRCglwYWdlX3NpemUYBCABKAUiKAoVR2V0Qm9va0RldGFpbHNSZXF1ZXN0Eg8KB2Jvb2tfaWQYASABKAMiOgoWR2V0Qm9va0RldGFpbHNSZXNwb25zZRIgCgRib29rGAEgASgLMhIuYm9va3N0b3JlLnYxLkJvb2siOAoTUHVyY2hhc2VCb29rUmVxdWVzdBIPCgdib29rX2lkGAEgASgDEhAKCHF1YW50aXR5GAIgASgFIkkKFFB1cmNoYXNlQm9va1Jlc3BvbnNlEg8KB21lc3NhZ2UYASABKAkSIAoEc2FsZRgCIAEoCzISLmJvb2tzdG9yZS52MS5TYWxlIi0KCENhcnRJdGVtEg8KB2Jvb2tfaWQYASABKAMSEAoIcXVhbnRpdHkYAiABKAUiPAoTQ2hlY2tvdXRDYXJ0UmVxdWVzdBIlCgVpdGVtcxgBIAMoCzIWLmJvb2tzdG9yZS52MS5DYXJ0SXRlbSJKChRDaGVja291dENhcnRSZXNwb25zZRIPCgdtZXNzYWdlGAEgASgJEiEKBXNhbGVzGAIgAygLMhIuYm9va3N0b3JlLnYxLlNhbGUiSAoQQWRkUmV2aWV3UmVxdWVzdBIPCgdib29rX2lkGAEgASgDEg4KBnJhdGluZxgCIAEoBRITCgtyZXZpZXdfdGV4dBgDIAEoCSI5ChFBZGRSZXZpZXdSZXNwb25zZRIkCgZyZXZpZXcYASABKAsyFC5ib29rc3RvcmUudjEuUmV2aWV3IigKFUdldEJvb2tSZXZpZXdzUmVxdWVzdBIPCgdib29rX2lkGAEgASgDIj8KFkdldEJvb2tSZXZpZXdzUmVzcG9uc2USJQoHcmV2aWV3cxgBIAMoCzIULmJvb2tzdG9yZS52MS5SZXZpZXciGwoZR2V0UHVyY2hhc2VIaXN0b3J5UmVxdWVzdCJDChpHZXRQdXJjaGFzZUhpc3RvcnlSZXNwb25zZRIlCglwdXJjaGFzZXMYASADKAsyEi5ib29rc3RvcmUudjEuU2FsZSInChdMb29rdXBCb29rQnlJU0JOUmVxdWVzdBIMCgRpc2JuGAEgASgJIrwBChhMb29rdXBCb29rQnlJU0JOUmVzcG9uc2USDQoFdGl0bGUYASABKAkSDgoGYXV0aG9yGAIgASgJEhEKCXB1Ymxpc2hlchgDIAEoCRIYChBwdWJsaWNhdGlvbl95ZWFyGAQgASgFEhIKCnBhZ2VfY291bnQYBSABKAUSEwoLZGVzY3JpcHRpb24YBiABKAkSFwoPY292ZXJfaW1hZ2VfdXJsGAcgASgJEhIKCmNhdGVnb3JpZXMYCCADKAkq9gEKBUdlbnJlEhUKEUdFTlJFX1VOU1BFQ0lGSUVEEAASCwoHRklDVElPThABEg8KC05PTl9GSUNUSU9OEAISCwoHU0NJRU5DRRADEgsKB0hJU1RPUlkQBBINCglCSU9HUkFQSFkQBRILCgdNWVNURVJZEAYSCwoHUk9NQU5DRRAHEgsKB0ZBTlRBU1kQCBITCg9TQ0lFTkNFX0ZJQ1RJT04QCRIMCghUSFJJTExFUhAKEgoKBkhPUlJPUhALEg0KCVNFTEZfSEVMUBAMEgwKCEJVU0lORVNTEA0SDgoKVEVDSE5PTE9HWRAOEgwKCENISUxEUkVOEA8qkQEKCVNvcnRPcmRlchIaChZTT1JUX09SREVSX1VOU1BFQ0lGSUVEEAASDQoJUFJJQ0VfQVNDEAESDgoKUFJJQ0VfREVTQxACEg0KCVRJVExFX0FTQxADEg4KClRJVExFX0RFU0MQBBIPCgtSQVRJTkdfREVTQxAFEhkKFVBVQkxJQ0FUSU9OX1lFQVJfREVTQxAGMv4ECg9NZXJjaGFudFNlcnZpY2USRgoHQWRkQm9vaxIcLmJvb2tzdG9yZS52MS5BZGRCb29rUmVxdWVzdBodLmJvb2tzdG9yZS52MS5BZGRCb29rUmVzcG9uc2USTwoKUmVtb3ZlQm9vaxIfLmJvb2tzdG9yZS52MS5SZW1vdmVCb29rUmVxdWVzdBogLmJvb2tzdG9yZS52MS5SZW1vdmVCb29rUmVzcG9uc2USUgoLVXBkYXRlU3RvY2sSIC5ib29rc3RvcmUudjEuVXBkYXRlU3RvY2tSZXF1ZXN0GiEuYm9va3N0b3JlLnYxLlVwZGF0ZVN0b2NrUmVzcG9uc2USYQoQR2V0TWVyY2hhbnRCb29rcxIlLmJvb2tzdG9yZS52MS5HZXRNZXJjaGFudEJvb2tzUmVxdWVzdBomLmJvb2tzdG9yZS52MS5HZXRNZXJjaGFudEJvb2tzUmVzcG9uc2USVQoMR2V0U29sZEJvb2tzEiEuYm9va3N0b3JlLnYxLkdldFNvbGRCb29rc1JlcXVlc3QaIi5ib29rc3RvcmUudjEuR2V0U29sZEJvb2tzUmVzcG9uc2USYQoQR2V0TG93U3RvY2tCb29rcxIlLmJvb2tzdG9yZS52MS5HZXRMb3dTdG9ja0Jvb2tzUmVxdWVzdBomLmJvb2tzdG9yZS52MS5HZXRMb3dTdG9ja0Jvb2tzUmVzcG9uc2USYQoQTG9va3VwQm9va0J5SVNCThIlLmJvb2tzdG9yZS52MS5Mb29rdXBCb29rQnlJU0JOUmVxdWVzdBomLmJvb2tzdG9yZS52MS5Mb29rdXBCb29rQnlJU0JOUmVzcG9uc2UylgUKD0N1c3RvbWVyU2VydmljZRJkChFHZXRBdmFpbGFibGVCb29rcxImLmJvb2tzdG9yZS52MS5HZXRBdmFpbGFibGVCb29rc1JlcXVlc3QaJy5ib29rc3RvcmUudjEuR2V0QXZhaWxhYmxlQm9va3NSZXNwb25zZRJbCg5HZXRCb29rRGV0YWlscxIjLmJvb2tzdG9yZS52MS5HZXRCb29rRGV0YWlsc1JlcXVlc3QaJC5ib29rc3RvcmUudjEuR2V0Qm9va0RldGFpbHNSZXNwb25zZRJVCgxQdXJjaGFzZUJvb2sSIS5ib29rc3RvcmUudjEuUHVyY2hhc2VCb29rUmVxdWVzdBoiLmJvb2tzdG9yZS52MS5QdXJjaGFzZUJvb2tSZXNwb25zZRJVCgxDaGVja291dENhcnQSIS5ib29rc3RvcmUudjEuQ2hlY2tvdXRDYXJ0UmVxdWVzdBoiLmJvb2tzdG9yZS52MS5DaGVja291dENhcnRSZXNwb25zZRJMCglBZGRSZXZpZXcSHi5ib29rc3RvcmUudjEuQWRkUmV2aWV3UmVxdWVzdBofLmJvb2tzdG9yZS52MS5BZGRSZXZpZXdSZXNwb25zZRJbCg5HZXRCb29rUmV2aWV3cxIjLmJvb2tzdG9yZS52MS5HZXRCb29rUmV2aWV3c1JlcXVlc3QaJC5ib29rc3RvcmUudjEuR2V0Qm9va1Jldmlld3NSZXNwb25zZRJnChJHZXRQdXJjaGFzZUhpc3RvcnkSJy5ib29rc3RvcmUudjEuR2V0UHVyY2hhc2VIaXN0b3J5UmVxdWVzdBooLmJvb2tzdG9yZS52MS5HZXRQdXJjaGFzZUhpc3RvcnlSZXNwb25zZUI2WjRnaXRodWIuY29tL0x1Y2t5UDg2SC9zbWFydC1ib29rc3RvcmUvZ2VuO2Jvb2tzdG9yZXYxYgZwcm90bzM");
+  fileDesc("Cg9ib29rc3RvcmUucHJvdG8SDGJvb2tzdG9yZS52MSKHAwoEQm9vaxIKCgJpZBgBIAEoAxIQCghzdG9yZV9pZBgCIAEoAxIMCgRpc2JuGAMgASgJEg0KBXRpdGxlGAQgASgJEg4KBmF1dGhvchgFIAEoCRIiCgVnZW5yZRgGIAEoDjITLmJvb2tzdG9yZS52MS5HZW5yZRIRCglwdWJsaXNoZXIYByABKAkSGAoQcHVibGljYXRpb25feWVhchgIIAEoBRISCgpwYWdlX2NvdW50GAkgASgFEhAKCGxhbmd1YWdlGAogASgJEhcKD2NvdmVyX2ltYWdlX3VybBgLIAEoCRITCgtkZXNjcmlwdGlvbhgMIAEoCRINCgVwcmljZRgNIAEoARIWCg5zdG9ja19xdWFudGl0eRgOIAEoBRISCgp0b3RhbF9zb2xkGA8gASgFEhYKDmF2ZXJhZ2VfcmF0aW5nGBAgASgBEhIKCmNyZWF0ZWRfYXQYESABKAkSEgoKc3RvcmVfbmFtZRgSIAEoCRIUCgxpc19zeW50aGV0aWMYEyABKAgiigEKBlJldmlldxIKCgJpZBgBIAEoAxIPCgdib29rX2lkGAIgASgDEhMKC2N1c3RvbWVyX2lkGAMgASgDEhUKDWN1c3RvbWVyX25hbWUYBCABKAkSDgoGcmF0aW5nGAUgASgFEhMKC3Jldmlld190ZXh0GAYgASgJEhIKCmNyZWF0ZWRfYXQYByABKAkipgEKBFNhbGUSCgoCaWQYASABKAMSDwoHYm9va19pZBgCIAEoAxISCgpib29rX3RpdGxlGAMgASgJEhMKC2N1c3RvbWVyX2lkGAQgASgDEhUKDWN1c3RvbWVyX25hbWUYBSABKAkSEAoIcXVhbnRpdHkYBiABKAUSGQoRcHJpY2VfYXRfcHVyY2hhc2UYByABKAESFAoMcHVyY2hhc2VkX2F0GAggASgJIokCCg5BZGRCb29rUmVxdWVzdBIMCgRpc2JuGAEgASgJEg0KBXRpdGxlGAIgASgJEg4KBmF1dGhvchgDIAEoCRIiCgVnZW5yZRgEIAEoDjITLmJvb2tzdG9yZS52MS5HZW5yZRIRCglwdWJsaXNoZXIYBSABKAkSGAoQcHVibGljYXRpb25feWVhchgGIAEoBRISCgpwYWdlX2NvdW50GAcgASgFEhAKCGxhbmd1YWdlGAggASgJEhcKD2NvdmVyX2ltYWdlX3VybBgJIAEoCRITCgtkZXNjcmlwdGlvbhgKIAEoCRINCgVwcmljZRgLIAEoARIWCg5zdG9ja19xdWFudGl0eRgMIAEoBSIzCg9BZGRCb29rUmVzcG9uc2USIAoEYm9vaxgBIAEoCzISLmJvb2tzdG9yZS52MS5Cb29rIiQKEVJlbW92ZUJvb2tSZXF1ZXN0Eg8KB2Jvb2tfaWQYASABKAMiJQoSUmVtb3ZlQm9va1Jlc3BvbnNlEg8KB21lc3NhZ2UYASABKAkiPgoSVXBkYXRlU3RvY2tSZXF1ZXN0Eg8KB2Jvb2tfaWQYASABKAMSFwoPcXVhbnRpdHlfdG9fYWRkGAIgASgFIjcKE1VwZGF0ZVN0b2NrUmVzcG9uc2USIAoEYm9vaxgBIAEoCzISLmJvb2tzdG9yZS52MS5Cb29rIjMKF0dldE1lcmNoYW50Qm9va3NSZXF1ZXN0EhgKEGluY2x1ZGVfc29sZF9vdXQYASABKAgiPQoYR2V0TWVyY2hhbnRCb29rc1Jlc3BvbnNlEiEKBWJvb2tzGAEgAygLMhIuYm9va3N0b3JlLnYxLkJvb2siOwoTR2V0U29sZEJvb2tzUmVxdWVzdBISCgpzdGFydF9kYXRlGAEgASgJEhAKCGVuZF9kYXRlGAIgASgJIjkKFEdldFNvbGRCb29rc1Jlc3BvbnNlEiEKBXNhbGVzGAEgAygLMhIuYm9va3N0b3JlLnYxLlNhbGUiLAoXR2V0TG93U3RvY2tCb29rc1JlcXVlc3QSEQoJdGhyZXNob2xkGAEgASgFIj0KGEdldExvd1N0b2NrQm9va3NSZXNwb25zZRIhCgVib29rcxgBIAMoCzISLmJvb2tzdG9yZS52MS5Cb29rIuYBChhHZXRBdmFpbGFibGVCb29rc1JlcXVlc3QSFAoMc2VhcmNoX3F1ZXJ5GAEgASgJEikKDGdlbnJlX2ZpbHRlchgCIAEoDjITLmJvb2tzdG9yZS52MS5HZW5yZRIVCg1hdXRob3JfZmlsdGVyGAMgASgJEhEKCW1pbl9wcmljZRgEIAEoARIRCgltYXhfcHJpY2UYBSABKAESKwoKc29ydF9vcmRlchgGIAEoDjIXLmJvb2tzdG9yZS52MS5Tb3J0T3JkZXISDAoEcGFnZRgHIAEoBRIRCglwYWdlX3NpemUYCCABKAUidAoZR2V0QXZhaWxhYmxlQm9va3NSZXNwb25zZRIhCgVib29rcxgBIAMoCzISLmJvb2tzdG9yZS52MS5Cb29rEhMKC3RvdGFsX2NvdW50GAIgASgFEgwKBHBhZ2UYAyABKAUSEQoJcGFnZV9zaXplGAQgASgFIigKFUdldEJvb2tEZXRhaWxzUmVxdWVzdBIPCgdib29rX2lkGAEgASgDIjoKFkdldEJvb2tEZXRhaWxzUmVzcG9uc2USIAoEYm9vaxgBIAEoCzISLmJvb2tzdG9yZS52MS5Cb29rIjgKE1B1cmNoYXNlQm9va1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAxIQCghxdWFudGl0eRgCIAEoBSJJChRQdXJjaGFzZUJvb2tSZXNwb25zZRIPCgdtZXNzYWdlGAEgASgJEiAKBHNhbGUYAiABKAsyEi5ib29rc3RvcmUudjEuU2FsZSItCghDYXJ0SXRlbRIPCgdib29rX2lkGAEgASgDEhAKCHF1YW50aXR5GAIgASgFIjwKE0NoZWNrb3V0Q2FydFJlcXVlc3QSJQoFaXRlbXMYASADKAsyFi5ib29rc3RvcmUudjEuQ2FydEl0ZW0iSgoUQ2hlY2tvdXRDYXJ0UmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIhCgVzYWxlcxgCIAMoCzISLmJvb2tzdG9yZS52MS5TYWxlIkgKEEFkZFJldmlld1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAxIOCgZyYXRpbmcYAiABKAUSEwoLcmV2aWV3X3RleHQYAyABKAkiOQoRQWRkUmV2aWV3UmVzcG9uc2USJAoGcmV2aWV3GAEgASgLMhQuYm9va3N0b3JlLnYxLlJldmlldyIoChVHZXRCb29rUmV2aWV3c1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAyI/ChZHZXRCb29rUmV2aWV3c1Jlc3BvbnNlEiUKB3Jldmlld3MYASADKAsyFC5ib29rc3RvcmUudjEuUmV2aWV3IhsKGUdldFB1cmNoYXNlSGlzdG9yeVJlcXVlc3QiQwoaR2V0UHVyY2hhc2VIaXN0b3J5UmVzcG9uc2USJQoJcHVyY2hhc2VzGAEgAygLMhIuYm9va3N0b3JlLnYxLlNhbGUiMgoOR2V0V29ya1JlcXVlc3QSDwoHYm9va19pZBgBIAEoAxIPCgd3b3JrX2lkGAIgASgDItABCglXb3JrT2ZmZXISEgoKbGlzdGluZ19pZBgBIAEoAxIQCghzdG9yZV9pZBgCIAEoAxISCgpzdG9yZV9uYW1lGAMgASgJEgwKBGlzYm4YBCABKAkSDQoFcHJpY2UYBSABKAESFgoOc3RvY2tfcXVhbnRpdHkYBiABKAUSFgoOYXZlcmFnZV9yYXRpbmcYByABKAESEgoKdG90YWxfc29sZBgIIAEoBRISCgplZGl0aW9uX2lkGAkgASgDEhQKDGlzX3N5bnRoZXRpYxgKIAEoCCKPAQoLV29ya0VkaXRpb24SEgoKZWRpdGlvbl9pZBgBIAEoAxINCgV0aXRsZRgCIAEoCRIRCglwdWJsaXNoZXIYAyABKAkSFAoMcHVibGlzaF95ZWFyGAQgASgFEhAKCGxhbmd1YWdlGAUgASgJEhIKCnBhZ2VfY291bnQYBiABKAUSDgoGaXNibjEzGAcgASgJIm4KCldvcmtSZXZpZXcSJAoGcmV2aWV3GAEgASgLMhQuYm9va3N0b3JlLnYxLlJldmlldxISCgpsaXN0aW5nX2lkGAIgASgDEhIKCnN0b3JlX25hbWUYAyABKAkSEgoKZWRpdGlvbl9pZBgEIAEoAyKjAwoPR2V0V29ya1Jlc3BvbnNlEg8KB3dvcmtfaWQYASABKAMSEwoLd29ya19yZWZfaWQYAiABKAMSFQoNbG9jYWxfd29ya19pZBgDIAEoAxINCgV0aXRsZRgEIAEoCRIWCg5hdXRob3JfZGlzcGxheRgFIAEoCRISCgpjYXRlZ29yaWVzGAYgAygJEhIKCnN1bW1hcnlfZW4YByABKAkSEgoKc3VtbWFyeV96aBgIIAEoCRInCgZvZmZlcnMYCSADKAsyFy5ib29rc3RvcmUudjEuV29ya09mZmVyEisKCGVkaXRpb25zGAogAygLMhkuYm9va3N0b3JlLnYxLldvcmtFZGl0aW9uEikKB3Jldmlld3MYCyADKAsyGC5ib29rc3RvcmUudjEuV29ya1JldmlldxIUCgxyZXZpZXdfY291bnQYDCABKAUSEwoLbWVhbl9yYXRpbmcYDSABKAESEQoJbWluX3ByaWNlGA4gASgBEhEKCW1heF9wcmljZRgPIAEoARIeChZoYXNfc3ludGhldGljX2xpc3RpbmdzGBAgASgIIicKF0xvb2t1cEJvb2tCeUlTQk5SZXF1ZXN0EgwKBGlzYm4YASABKAkimQIKGExvb2t1cEJvb2tCeUlTQk5SZXNwb25zZRINCgV0aXRsZRgBIAEoCRIOCgZhdXRob3IYAiABKAkSEQoJcHVibGlzaGVyGAMgASgJEhgKEHB1YmxpY2F0aW9uX3llYXIYBCABKAUSEgoKcGFnZV9jb3VudBgFIAEoBRITCgtkZXNjcmlwdGlvbhgGIAEoCRIXCg9jb3Zlcl9pbWFnZV91cmwYByABKAkSEgoKY2F0ZWdvcmllcxgIIAMoCRIOCgZzb3VyY2UYCSABKAkSEwoLYXR0cmlidXRpb24YCiABKAkSHQoVZGVzY3JpcHRpb25fdHJhbnNpZW50GAsgASgIEhcKD2NvdmVyX3RyYW5zaWVudBgMIAEoCCr2AQoFR2VucmUSFQoRR0VOUkVfVU5TUEVDSUZJRUQQABILCgdGSUNUSU9OEAESDwoLTk9OX0ZJQ1RJT04QAhILCgdTQ0lFTkNFEAMSCwoHSElTVE9SWRAEEg0KCUJJT0dSQVBIWRAFEgsKB01ZU1RFUlkQBhILCgdST01BTkNFEAcSCwoHRkFOVEFTWRAIEhMKD1NDSUVOQ0VfRklDVElPThAJEgwKCFRIUklMTEVSEAoSCgoGSE9SUk9SEAsSDQoJU0VMRl9IRUxQEAwSDAoIQlVTSU5FU1MQDRIOCgpURUNITk9MT0dZEA4SDAoIQ0hJTERSRU4QDyqRAQoJU29ydE9yZGVyEhoKFlNPUlRfT1JERVJfVU5TUEVDSUZJRUQQABINCglQUklDRV9BU0MQARIOCgpQUklDRV9ERVNDEAISDQoJVElUTEVfQVNDEAMSDgoKVElUTEVfREVTQxAEEg8KC1JBVElOR19ERVNDEAUSGQoVUFVCTElDQVRJT05fWUVBUl9ERVNDEAYy/gQKD01lcmNoYW50U2VydmljZRJGCgdBZGRCb29rEhwuYm9va3N0b3JlLnYxLkFkZEJvb2tSZXF1ZXN0Gh0uYm9va3N0b3JlLnYxLkFkZEJvb2tSZXNwb25zZRJPCgpSZW1vdmVCb29rEh8uYm9va3N0b3JlLnYxLlJlbW92ZUJvb2tSZXF1ZXN0GiAuYm9va3N0b3JlLnYxLlJlbW92ZUJvb2tSZXNwb25zZRJSCgtVcGRhdGVTdG9jaxIgLmJvb2tzdG9yZS52MS5VcGRhdGVTdG9ja1JlcXVlc3QaIS5ib29rc3RvcmUudjEuVXBkYXRlU3RvY2tSZXNwb25zZRJhChBHZXRNZXJjaGFudEJvb2tzEiUuYm9va3N0b3JlLnYxLkdldE1lcmNoYW50Qm9va3NSZXF1ZXN0GiYuYm9va3N0b3JlLnYxLkdldE1lcmNoYW50Qm9va3NSZXNwb25zZRJVCgxHZXRTb2xkQm9va3MSIS5ib29rc3RvcmUudjEuR2V0U29sZEJvb2tzUmVxdWVzdBoiLmJvb2tzdG9yZS52MS5HZXRTb2xkQm9va3NSZXNwb25zZRJhChBHZXRMb3dTdG9ja0Jvb2tzEiUuYm9va3N0b3JlLnYxLkdldExvd1N0b2NrQm9va3NSZXF1ZXN0GiYuYm9va3N0b3JlLnYxLkdldExvd1N0b2NrQm9va3NSZXNwb25zZRJhChBMb29rdXBCb29rQnlJU0JOEiUuYm9va3N0b3JlLnYxLkxvb2t1cEJvb2tCeUlTQk5SZXF1ZXN0GiYuYm9va3N0b3JlLnYxLkxvb2t1cEJvb2tCeUlTQk5SZXNwb25zZTLeBQoPQ3VzdG9tZXJTZXJ2aWNlEmQKEUdldEF2YWlsYWJsZUJvb2tzEiYuYm9va3N0b3JlLnYxLkdldEF2YWlsYWJsZUJvb2tzUmVxdWVzdBonLmJvb2tzdG9yZS52MS5HZXRBdmFpbGFibGVCb29rc1Jlc3BvbnNlElsKDkdldEJvb2tEZXRhaWxzEiMuYm9va3N0b3JlLnYxLkdldEJvb2tEZXRhaWxzUmVxdWVzdBokLmJvb2tzdG9yZS52MS5HZXRCb29rRGV0YWlsc1Jlc3BvbnNlElUKDFB1cmNoYXNlQm9vaxIhLmJvb2tzdG9yZS52MS5QdXJjaGFzZUJvb2tSZXF1ZXN0GiIuYm9va3N0b3JlLnYxLlB1cmNoYXNlQm9va1Jlc3BvbnNlElUKDENoZWNrb3V0Q2FydBIhLmJvb2tzdG9yZS52MS5DaGVja291dENhcnRSZXF1ZXN0GiIuYm9va3N0b3JlLnYxLkNoZWNrb3V0Q2FydFJlc3BvbnNlEkwKCUFkZFJldmlldxIeLmJvb2tzdG9yZS52MS5BZGRSZXZpZXdSZXF1ZXN0Gh8uYm9va3N0b3JlLnYxLkFkZFJldmlld1Jlc3BvbnNlElsKDkdldEJvb2tSZXZpZXdzEiMuYm9va3N0b3JlLnYxLkdldEJvb2tSZXZpZXdzUmVxdWVzdBokLmJvb2tzdG9yZS52MS5HZXRCb29rUmV2aWV3c1Jlc3BvbnNlEmcKEkdldFB1cmNoYXNlSGlzdG9yeRInLmJvb2tzdG9yZS52MS5HZXRQdXJjaGFzZUhpc3RvcnlSZXF1ZXN0GiguYm9va3N0b3JlLnYxLkdldFB1cmNoYXNlSGlzdG9yeVJlc3BvbnNlEkYKB0dldFdvcmsSHC5ib29rc3RvcmUudjEuR2V0V29ya1JlcXVlc3QaHS5ib29rc3RvcmUudjEuR2V0V29ya1Jlc3BvbnNlQjZaNGdpdGh1Yi5jb20vTHVja3lQODZIL3NtYXJ0LWJvb2tzdG9yZS9nZW47Ym9va3N0b3JldjFiBnByb3RvMw");
 
 /**
  * @generated from message bookstore.v1.Book
@@ -105,6 +105,16 @@ export type Book = Message<"bookstore.v1.Book"> & {
    * @generated from field: string store_name = 18;
    */
   storeName: string;
+
+  /**
+   * Route B P4 (additive): synthetic-fixture disclosure (plan §4.4). True
+   * for seed/demo listings; the UI labels them instead of presenting them
+   * as real inventory. The Go backend predates the flag and leaves it
+   * false — a documented divergence, like GetWork below.
+   *
+   * @generated from field: bool is_synthetic = 19;
+   */
+  isSynthetic: boolean;
 };
 
 /**
@@ -817,6 +827,290 @@ export const GetPurchaseHistoryResponseSchema: GenMessage<GetPurchaseHistoryResp
   messageDesc(file_bookstore, 29);
 
 /**
+ * @generated from message bookstore.v1.GetWorkRequest
+ */
+export type GetWorkRequest = Message<"bookstore.v1.GetWorkRequest"> & {
+  /**
+   * Identify the work by one of its listings (the frontend only ever
+   * holds listing ids) or by the projection work id directly. book_id
+   * wins when both are set.
+   *
+   * @generated from field: int64 book_id = 1;
+   */
+  bookId: bigint;
+
+  /**
+   * @generated from field: int64 work_id = 2;
+   */
+  workId: bigint;
+};
+
+/**
+ * Describes the message bookstore.v1.GetWorkRequest.
+ * Use `create(GetWorkRequestSchema)` to create a new message.
+ */
+export const GetWorkRequestSchema: GenMessage<GetWorkRequest> = /*@__PURE__*/
+  messageDesc(file_bookstore, 30);
+
+/**
+ * One store's offer of the work (a member listing, via listing_links).
+ *
+ * @generated from message bookstore.v1.WorkOffer
+ */
+export type WorkOffer = Message<"bookstore.v1.WorkOffer"> & {
+  /**
+   * @generated from field: int64 listing_id = 1;
+   */
+  listingId: bigint;
+
+  /**
+   * @generated from field: int64 store_id = 2;
+   */
+  storeId: bigint;
+
+  /**
+   * @generated from field: string store_name = 3;
+   */
+  storeName: string;
+
+  /**
+   * @generated from field: string isbn = 4;
+   */
+  isbn: string;
+
+  /**
+   * @generated from field: double price = 5;
+   */
+  price: number;
+
+  /**
+   * @generated from field: int32 stock_quantity = 6;
+   */
+  stockQuantity: number;
+
+  /**
+   * @generated from field: double average_rating = 7;
+   */
+  averageRating: number;
+
+  /**
+   * @generated from field: int32 total_sold = 8;
+   */
+  totalSold: number;
+
+  /**
+   * The ref_editions id this listing is linked to (0 when the link is
+   * work-only or the work is local).
+   *
+   * @generated from field: int64 edition_id = 9;
+   */
+  editionId: bigint;
+
+  /**
+   * @generated from field: bool is_synthetic = 10;
+   */
+  isSynthetic: boolean;
+};
+
+/**
+ * Describes the message bookstore.v1.WorkOffer.
+ * Use `create(WorkOfferSchema)` to create a new message.
+ */
+export const WorkOfferSchema: GenMessage<WorkOffer> = /*@__PURE__*/
+  messageDesc(file_bookstore, 31);
+
+/**
+ * One published form of the work, from the reference catalogue.
+ *
+ * @generated from message bookstore.v1.WorkEdition
+ */
+export type WorkEdition = Message<"bookstore.v1.WorkEdition"> & {
+  /**
+   * @generated from field: int64 edition_id = 1;
+   */
+  editionId: bigint;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string publisher = 3;
+   */
+  publisher: string;
+
+  /**
+   * @generated from field: int32 publish_year = 4;
+   */
+  publishYear: number;
+
+  /**
+   * @generated from field: string language = 5;
+   */
+  language: string;
+
+  /**
+   * @generated from field: int32 page_count = 6;
+   */
+  pageCount: number;
+
+  /**
+   * @generated from field: string isbn13 = 7;
+   */
+  isbn13: string;
+};
+
+/**
+ * Describes the message bookstore.v1.WorkEdition.
+ * Use `create(WorkEditionSchema)` to create a new message.
+ */
+export const WorkEditionSchema: GenMessage<WorkEdition> = /*@__PURE__*/
+  messageDesc(file_bookstore, 32);
+
+/**
+ * A review of one member listing, rolled up onto the work (§8: reviews
+ * roll up through current membership). The Review message names the
+ * reviewer; the fields here add the listing it was written about, the
+ * store selling that listing, and the edition the listing is linked to
+ * — so "great translation" and "bad printing" stay distinguishable.
+ *
+ * @generated from message bookstore.v1.WorkReview
+ */
+export type WorkReview = Message<"bookstore.v1.WorkReview"> & {
+  /**
+   * @generated from field: bookstore.v1.Review review = 1;
+   */
+  review?: Review | undefined;
+
+  /**
+   * @generated from field: int64 listing_id = 2;
+   */
+  listingId: bigint;
+
+  /**
+   * @generated from field: string store_name = 3;
+   */
+  storeName: string;
+
+  /**
+   * @generated from field: int64 edition_id = 4;
+   */
+  editionId: bigint;
+};
+
+/**
+ * Describes the message bookstore.v1.WorkReview.
+ * Use `create(WorkReviewSchema)` to create a new message.
+ */
+export const WorkReviewSchema: GenMessage<WorkReview> = /*@__PURE__*/
+  messageDesc(file_bookstore, 33);
+
+/**
+ * @generated from message bookstore.v1.GetWorkResponse
+ */
+export type GetWorkResponse = Message<"bookstore.v1.GetWorkResponse"> & {
+  /**
+   * The projection row id (works.id).
+   *
+   * @generated from field: int64 work_id = 1;
+   */
+  workId: bigint;
+
+  /**
+   * Exactly one of these is set: the reference work, or the local work
+   * for residue listings.
+   *
+   * @generated from field: int64 work_ref_id = 2;
+   */
+  workRefId: bigint;
+
+  /**
+   * @generated from field: int64 local_work_id = 3;
+   */
+  localWorkId: bigint;
+
+  /**
+   * @generated from field: string title = 4;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string author_display = 5;
+   */
+  authorDisplay: string;
+
+  /**
+   * @generated from field: repeated string categories = 6;
+   */
+  categories: string[];
+
+  /**
+   * @generated from field: string summary_en = 7;
+   */
+  summaryEn: string;
+
+  /**
+   * @generated from field: string summary_zh = 8;
+   */
+  summaryZh: string;
+
+  /**
+   * @generated from field: repeated bookstore.v1.WorkOffer offers = 9;
+   */
+  offers: WorkOffer[];
+
+  /**
+   * @generated from field: repeated bookstore.v1.WorkEdition editions = 10;
+   */
+  editions: WorkEdition[];
+
+  /**
+   * @generated from field: repeated bookstore.v1.WorkReview reviews = 11;
+   */
+  reviews: WorkReview[];
+
+  /**
+   * Aggregates with exact denominators (§8): review_count is the number
+   * of member reviews mean_rating averages over; the price spread is
+   * over all member offers (0/0 when there are none).
+   *
+   * @generated from field: int32 review_count = 12;
+   */
+  reviewCount: number;
+
+  /**
+   * @generated from field: double mean_rating = 13;
+   */
+  meanRating: number;
+
+  /**
+   * @generated from field: double min_price = 14;
+   */
+  minPrice: number;
+
+  /**
+   * @generated from field: double max_price = 15;
+   */
+  maxPrice: number;
+
+  /**
+   * True when any member listing is a synthetic fixture — the page must
+   * disclose demo data (§4.4), never present it as real social proof.
+   *
+   * @generated from field: bool has_synthetic_listings = 16;
+   */
+  hasSyntheticListings: boolean;
+};
+
+/**
+ * Describes the message bookstore.v1.GetWorkResponse.
+ * Use `create(GetWorkResponseSchema)` to create a new message.
+ */
+export const GetWorkResponseSchema: GenMessage<GetWorkResponse> = /*@__PURE__*/
+  messageDesc(file_bookstore, 34);
+
+/**
  * @generated from message bookstore.v1.LookupBookByISBNRequest
  */
 export type LookupBookByISBNRequest = Message<"bookstore.v1.LookupBookByISBNRequest"> & {
@@ -831,7 +1125,7 @@ export type LookupBookByISBNRequest = Message<"bookstore.v1.LookupBookByISBNRequ
  * Use `create(LookupBookByISBNRequestSchema)` to create a new message.
  */
 export const LookupBookByISBNRequestSchema: GenMessage<LookupBookByISBNRequest> = /*@__PURE__*/
-  messageDesc(file_bookstore, 30);
+  messageDesc(file_bookstore, 35);
 
 /**
  * @generated from message bookstore.v1.LookupBookByISBNResponse
@@ -876,6 +1170,34 @@ export type LookupBookByISBNResponse = Message<"bookstore.v1.LookupBookByISBNRes
    * @generated from field: repeated string categories = 8;
    */
   categories: string[];
+
+  /**
+   * Route B P4 (additive), the §4.6 data rule made visible to the form:
+   * which source produced this prefill — "local_index", "open_library" or
+   * "google_books" — plus the attribution line to show next to it. When
+   * the source is Google Books, the description and cover are TRANSIENT:
+   * the form may display them with attribution but must not submit them
+   * to AddBook (Google APIs Terms §5(e) forbids persisting them). The
+   * *_transient flags say exactly that, per field.
+   *
+   * @generated from field: string source = 9;
+   */
+  source: string;
+
+  /**
+   * @generated from field: string attribution = 10;
+   */
+  attribution: string;
+
+  /**
+   * @generated from field: bool description_transient = 11;
+   */
+  descriptionTransient: boolean;
+
+  /**
+   * @generated from field: bool cover_transient = 12;
+   */
+  coverTransient: boolean;
 };
 
 /**
@@ -883,7 +1205,7 @@ export type LookupBookByISBNResponse = Message<"bookstore.v1.LookupBookByISBNRes
  * Use `create(LookupBookByISBNResponseSchema)` to create a new message.
  */
 export const LookupBookByISBNResponseSchema: GenMessage<LookupBookByISBNResponse> = /*@__PURE__*/
-  messageDesc(file_bookstore, 31);
+  messageDesc(file_bookstore, 36);
 
 /**
  * @generated from enum bookstore.v1.Genre
@@ -1159,6 +1481,17 @@ export const CustomerService: GenService<{
     methodKind: "unary";
     input: typeof GetPurchaseHistoryRequestSchema;
     output: typeof GetPurchaseHistoryResponseSchema;
+  },
+  /**
+   * Work Pages (Route B P4, plan §8). Worker-only: the Go backend does
+   * not implement this RPC (Go parity is frozen at the P3 surface).
+   *
+   * @generated from rpc bookstore.v1.CustomerService.GetWork
+   */
+  getWork: {
+    methodKind: "unary";
+    input: typeof GetWorkRequestSchema;
+    output: typeof GetWorkResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_bookstore, 1);
