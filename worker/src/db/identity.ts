@@ -219,25 +219,34 @@ async function writeLink(
   bands: AgreementBands,
   existing: ExistingLink | null,
 ): Promise<void> {
-  await deps.begin(async (tx) => {
-    // ai/runs.ts works against the Db shape; inside the transaction
-    // the run's writes must go through the tx runner.
-    const txDb: Db = { run: tx, begin: deps.begin, close: async () => {} };
-    const runId = await startRun(txDb, {
-      kind: "derive_listing_links",
-      provider: "worker",
-      listingId: listing.id,
-      input: { path: "a", isbn13, source },
-    });
-    const evidenceId = await insertEvidence(
-      tx,
-      listing.id,
-      candidate,
-      bands,
-      "auto_linked",
-    );
-    await tx(
-      `INSERT INTO listing_links
+  // F3 option C (LAYOUT-DECISION §3, user-decided 2026-11-15): the
+  // success path below is exactly the original shape — startRun /
+  // finishRun inside the link transaction, so a committed 'ok' run
+  // always corresponds to a committed link. Only the failure path is
+  // new: when the transaction rolls back, its ai_runs row vanishes
+  // with it, so the catch block writes ONE compensating run on the
+  // non-transactional handle (see writeCompensatingErrorRun).
+  const runInput = { path: "a", isbn13, source };
+  try {
+    await deps.begin(async (tx) => {
+      // ai/runs.ts works against the Db shape; inside the transaction
+      // the run's writes must go through the tx runner.
+      const txDb: Db = { run: tx, begin: deps.begin, close: async () => {} };
+      const runId = await startRun(txDb, {
+        kind: "derive_listing_links",
+        provider: "worker",
+        listingId: listing.id,
+        input: runInput,
+      });
+      const evidenceId = await insertEvidence(
+        tx,
+        listing.id,
+        candidate,
+        bands,
+        "auto_linked",
+      );
+      await tx(
+        `INSERT INTO listing_links
          (listing_id, edition_ref_id, work_ref_id, local_work_id,
           status, derivation_run_id)
        VALUES ($1, $2, $3, NULL, 'automatic', $4)
@@ -248,12 +257,12 @@ async function writeLink(
          status = 'automatic',
          derivation_run_id = EXCLUDED.derivation_run_id,
          updated_at = now()`,
-      [listing.id, candidate.editionId, candidate.workRefId, runId],
-    );
-    // Minimal facets (the §3.2 facet PARSER is PR 4's Path B work;
-    // Path A records the join inputs it actually used).
-    await tx(
-      `INSERT INTO listing_facets
+        [listing.id, candidate.editionId, candidate.workRefId, runId],
+      );
+      // Minimal facets (the §3.2 facet PARSER is PR 4's Path B work;
+      // Path A records the join inputs it actually used).
+      await tx(
+        `INSERT INTO listing_facets
          (listing_id, isbn13, title_key, author_keys, language)
        VALUES ($1, $2, $3, $4, NULL)
        ON CONFLICT (listing_id) DO UPDATE SET
@@ -261,38 +270,90 @@ async function writeLink(
          title_key = EXCLUDED.title_key,
          author_keys = EXCLUDED.author_keys,
          updated_at = now()`,
-      [
-        listing.id,
-        isbn13,
-        normalizeForAgreement(listing.title) || null,
-        [normalizeForAgreement(listing.author)].filter((a) => a !== ""),
-      ],
-    );
-    await tx(
-      `INSERT INTO identity_events
+        [
+          listing.id,
+          isbn13,
+          normalizeForAgreement(listing.title) || null,
+          [normalizeForAgreement(listing.author)].filter((a) => a !== ""),
+        ],
+      );
+      await tx(
+        `INSERT INTO identity_events
          (listing_id, event_type, actor, from_state, to_state,
           evidence_ids, manifest)
        VALUES ($1, $2, 'path-a', $3::jsonb, $4::jsonb, $5, $6::jsonb)`,
-      [
-        listing.id,
-        existing === null ? "link" : "relink",
-        linkStateJson(existing),
-        {
+        [
+          listing.id,
+          existing === null ? "link" : "relink",
+          linkStateJson(existing),
+          {
+            edition_ref_id: candidate.editionId.toString(),
+            work_ref_id: candidate.workRefId.toString(),
+          },
+          [evidenceId],
+          { path: "a", isbn13, source, bands },
+        ],
+      );
+      await finishRun(txDb, runId, {
+        output: {
           edition_ref_id: candidate.editionId.toString(),
           work_ref_id: candidate.workRefId.toString(),
+          bands,
         },
-        [evidenceId],
-        { path: "a", isbn13, source, bands },
-      ],
-    );
-    await finishRun(txDb, runId, {
+      });
+    });
+  } catch (err) {
+    // The link transaction has rolled back by the time control reaches
+    // here (deps.begin rejects only after rollback), so the attempt's
+    // in-transaction ai_runs row is gone. Record the failure on the
+    // outer handle, then rethrow the ORIGINAL error: callers keep the
+    // exact failure they would have seen without the ledger write
+    // (AddBook's caller logs it; link_seed aborts on it).
+    await writeCompensatingErrorRun(deps, listing, runInput, candidate, bands, err);
+    throw err;
+  }
+}
+
+/**
+ * F3 option C's compensating record: ONE ai_runs row for a rolled-back
+ * link attempt, written start+finish on the non-transactional handle
+ * so it is born in its terminal 'error' state — this path can never
+ * leave an orphaned 'running' row. It carries the attempt's inputs
+ * (the same payload the in-transaction startRun used) and the caught
+ * error; it cannot carry the rolled-back run's id, which never
+ * committed — the inputs are the linkage. A failure of the
+ * compensating write itself is swallowed: the ledger must never mask
+ * or replace the real link failure the caller is about to receive.
+ */
+async function writeCompensatingErrorRun(
+  deps: PathADeps,
+  listing: ListingForLinking,
+  runInput: { path: string; isbn13: string; source: "isbn_index" | "open_library" },
+  candidate: Candidate & { workRefId: bigint },
+  bands: AgreementBands,
+  err: unknown,
+): Promise<void> {
+  const outerDb: Db = { run: deps.run, begin: deps.begin, close: async () => {} };
+  try {
+    const runId = await startRun(outerDb, {
+      kind: "derive_listing_links",
+      provider: "worker",
+      listingId: listing.id,
+      input: runInput,
+    });
+    await finishRun(outerDb, runId, {
+      status: "error",
+      error: err instanceof Error ? err.message : String(err),
       output: {
         edition_ref_id: candidate.editionId.toString(),
         work_ref_id: candidate.workRefId.toString(),
         bands,
+        compensated: true,
       },
     });
-  });
+  } catch {
+    // Deliberately empty — see the doc comment above.
+  }
 }
 
 async function writeDemotion(
