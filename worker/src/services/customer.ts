@@ -15,6 +15,7 @@ import {
   getPurchaseHistory,
   purchaseBook,
 } from "../db/queries";
+import { getWork } from "../db/works";
 import {
   AddReviewResponseSchema,
   CheckoutCartResponseSchema,
@@ -172,6 +173,34 @@ export function createCustomerService(
         const purchases = await getPurchaseHistory(run, identity.storeId);
         return create(GetPurchaseHistoryResponseSchema, { purchases });
       } catch (err) {
+        throw internal(err);
+      }
+    },
+
+    // GetWork (plan §8) — Worker-only; the Go backend does not serve
+    // this RPC (Go parity is frozen at the P3 surface, §12 decision
+    // 8). Like the other customer reads it needs no specific identity,
+    // just the authenticated caller the interceptor already enforced.
+    async getWork(req) {
+      if (req.bookId === 0n && req.workId === 0n) {
+        throw new ConnectError(
+          "book_id or work_id is required",
+          Code.InvalidArgument,
+        );
+      }
+      try {
+        const work = await getWork(run, {
+          bookId: req.bookId === 0n ? undefined : req.bookId,
+          workId: req.workId === 0n ? undefined : req.workId,
+        });
+        if (work === null) {
+          throw new ConnectError("work not found", Code.NotFound);
+        }
+        return work;
+      } catch (err) {
+        if (err instanceof ConnectError) {
+          throw err;
+        }
         throw internal(err);
       }
     },

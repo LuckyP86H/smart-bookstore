@@ -29,6 +29,10 @@ import {
   type TransactionRunner,
 } from "./db/client";
 import type { Env } from "./env";
+import {
+  createOpenLibraryEditionLookup,
+  type OlEditionInfo,
+} from "./external/open-library";
 import { CustomerService, MerchantService } from "./gen/bookstore_pb";
 import { createCustomerService } from "./services/customer";
 import { createMerchantService } from "./services/merchant";
@@ -49,6 +53,20 @@ export interface ServeConnectOptions {
    * rather than ever running outside a transaction.
    */
   begin?: TransactionRunner;
+  /**
+   * P4 Path A: when present, AddBook links each new listing after its
+   * upsert, using `begin` for the link transaction and this Open
+   * Library lookup as the single-lookup fallback. handleConnectRequest
+   * wires it; tests omit it and AddBook stays exactly the P3 behaviour.
+   */
+  pathA?: {
+    lookupEdition?: (isbn13: string) => Promise<OlEditionInfo | null>;
+  };
+  /**
+   * HTTP implementation for the prefill lookups (Open Library / Google
+   * Books). Tests inject a stub; production uses the global fetch.
+   */
+  fetchFn?: typeof fetch;
 }
 
 /** The begin used when no transaction runner was wired: always fails. */
@@ -80,7 +98,16 @@ export async function serveConnectRequest(
   });
   router.service(
     MerchantService,
-    createMerchantService(run, env.GOOGLE_BOOKS_API_KEY),
+    createMerchantService(run, env.GOOGLE_BOOKS_API_KEY, {
+      identity:
+        options.pathA !== undefined
+          ? {
+              begin: options.begin ?? unavailableBegin,
+              lookupEdition: options.pathA.lookupEdition,
+            }
+          : undefined,
+      fetchFn: options.fetchFn,
+    }),
   );
   router.service(
     CustomerService,
@@ -105,6 +132,11 @@ export async function serveConnectRequest(
   return toFetchResponse(universalResponse);
 }
 
+// One rate-limited, memoised Open Library fallback per isolate — the
+// cache's scope is the isolate's lifetime by design (decision D3-13:
+// lookup results are decision inputs, never persisted data).
+const sharedOpenLibraryLookup = createOpenLibraryEditionLookup();
+
 /** Worker entry point: one Hyperdrive-backed client per request. */
 export async function handleConnectRequest(
   request: Request,
@@ -117,6 +149,7 @@ export async function handleConnectRequest(
       waitUntil:
         ctx !== undefined ? (promise) => ctx.waitUntil(promise) : undefined,
       begin: db.begin,
+      pathA: { lookupEdition: sharedOpenLibraryLookup },
     });
   } finally {
     await db.close().catch(() => undefined);
