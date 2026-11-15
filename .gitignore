@@ -64,3 +64,6 @@ node_modules/
 .wrangler/
 .dev.vars
 scripts/.seed-cloud.bundle.mjs
+
+# Schema gate harness logs (scripts/schema/run_gate.sh)
+scripts/schema/gate-logs/
