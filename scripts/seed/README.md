@@ -29,7 +29,7 @@ it. **Nothing here has touched the live database.**
 1. **Apply PR 2's five migrations first**, in the Supabase dashboard
    SQL editor, **one file at a time, in filename order**:
    `20261111130000_p4_reference_catalogue.sql`,
-   `20261111130100_p4_listing_facets_categories.sql`,
+   `20261111130100_p4_listing_facets.sql`,
    `20261111130200_p4_identity_store.sql`,
    `20261111130300_p4_works_projection.sql`,
    `20261111130400_p4_ai_platform.sql`
@@ -37,10 +37,20 @@ it. **Nothing here has touched the live database.**
    are already live). The dashboard route is deliberate — it is the
    credential-free path this project has used throughout; do not paste
    the database password anywhere else.
-2. **One new Python package** in the PR 1 data venv (the loader's
+2. **Check the `review_aspects_queue` view's PostgREST exposure
+   before seeding.** After applying the migrations, check the
+   `review_aspects_queue` view's PostgREST exposure / grants on
+   the live Supabase project (the migration creates the view in
+   `public` with no grant/revoke statement of its own; confirm it
+   is not readable via the public API keys beyond what the
+   RLS-enabled underlying tables intend). If it is readable via
+   PostgREST, a corrective step (e.g. recreating the view
+   `WITH (security_invoker = true)` or revoking grants) must
+   precede the seed load.
+3. **One new Python package** in the PR 1 data venv (the loader's
    only dependency beyond what PR 1 already installed):
    `pip install "psycopg[binary]"`
-3. **Run the loader** with your own connection string (the
+4. **Run the loader** with your own connection string (the
    session-pooler or direct connection string from the Supabase
    dashboard — it never goes through chat or any file):
 
@@ -50,14 +60,14 @@ it. **Nothing here has touched the live database.**
        <data-dir>/venv/bin/python scripts/seed/load_slice.py
    ```
 
-   Expected report (snapshot `ol-2026-11-11`, derived from the slice
+   Expected report (snapshot `ol-2026-11-13`, derived from the slice
    manifest): `ref_authors` 5,070 · `ref_author_aliases` 21,597 ·
    `ref_works` 4,993 · `ref_editions` 20,000 · `isbn_index` 13,940 ·
    `works` projection 4,993, ending in `RESULT: PASS`. The loader is
    insert-if-absent: re-running it against the same snapshot inserts
    0 rows and reports the same totals, so a interrupted run is safe
    to repeat.
-4. **Optionally** seed the synthetic demo listings (staging flavour
+5. **Optionally** seed the synthetic demo listings (staging flavour
    only — they are fixtures with a shared password, `seed-password`,
    and are disclosed as demo data everywhere they surface):
 
@@ -82,7 +92,7 @@ it. **Nothing here has touched the live database.**
   `isbn_index` cut (13,940 rows) is slice-scoped per plan §4.2 step 3
   (the full 37M-row ISBN map stays off-database) and cross-checks
   exactly against PR 1's independent `isbn_map.parquet`.
-- **Every reference row carries the snapshot id** (`ol-2026-11-11`,
+- **Every reference row carries the snapshot id** (`ol-2026-11-13`,
   derived deterministically from the manifest's `generated_at`;
   override with `SNAPSHOT_ID`).
 - **29 slice ISBNs fail checksum validation and are skipped** — the
@@ -120,7 +130,7 @@ it. **Nothing here has touched the live database.**
   across stores, with synthetic listings badged as demo data. The
   divergence is also recorded in `DEPLOY.md`.
 
-## Gate results (local, 2026-11-12)
+## Gate results (local, final run 2026-11-15 at `efdec56`; originally run 2026-11-12 with identical seed-gate numbers)
 
 `scripts/seed/run_gate.sh` against scratch PostgreSQL 16.15 +
 pgvector 0.8.0: **10 passed, 0 failed** — loader counts = manifest,
@@ -129,7 +139,7 @@ demotion / 1 no-ISBN-skip over the 8 archetype listings,
 `assertions.sql` 8/8 groups, B-mask spot joins 12/12, and the real
 `GetWork` RPC returned the hub work merged across stores with the
 sold listing's review attributed. Repo gates alongside: vitest
-184/184, typecheck clean, frontend production build green (zero
+191/191, typecheck clean, frontend production build green (zero
 `localhost` strings in the output).
 
 Two rehearsal catches worth knowing about (both fixed in this PR's
@@ -137,7 +147,9 @@ own code, details in the build log): the evidence table's score
 column is `total_score` and an evidence row names exactly one
 candidate; and jsonb parameters through the Worker DB seam must be
 passed as objects — postgres.js re-encodes pre-stringified JSON.
-The same stringification pattern exists in PR 2's `ai/runs.ts`
-(`ai_runs.input`/`output` land double-encoded through the real
-driver): flagged for a separate small fix, deliberately not folded
-into this PR.
+The same stringification pattern existed in PR 2's original
+`ai/runs.ts` (`ai_runs.input`/`output` landed double-encoded
+through the real driver); it was fixed in PR #63's review rounds
+and this branch inherited the fix via rebase onto the merged PR 2
+— the gate DB's `ai_runs` payloads are verified jsonb objects, and
+no follow-up remains.
