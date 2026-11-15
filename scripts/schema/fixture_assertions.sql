@@ -214,19 +214,63 @@ $$;
 select 'PASS: listing_links CHECK rejects a row with both local_work_id and edition_ref_id' as gate;
 
 -- 6. the Path B task is claimable ----------------------------------------------------------
+-- The claimable predicate is the plan §5 claim WHERE clause: pending,
+-- run_after due, and not locked (locked_until NULL or already past).
+-- The fixture task (locked_until NULL) must match it; the probes below
+-- pin the other two directions — a future-locked task and a
+-- future-dated task must NOT match, a past-locked one must. (Before
+-- PR #63 review round 4 the probe ignored locked_until entirely, so
+-- a future-locked task "passed" as claimable.)
 
 do $$
+declare
+  v_future_locked bigint;
+  v_past_locked bigint;
+  v_future_dated bigint;
 begin
   if not exists (
     select 1 from public.tasks
-    where kind = 'resolve_path_b' and status = 'pending' and run_after <= now()
+    where kind = 'resolve_path_b' and status = 'pending'
+      and run_after <= now()
+      and (locked_until is null or locked_until <= now())
   ) then
-    raise exception 'fixture_assertions: no claimable resolve_path_b task (pending, run_after <= now())';
+    raise exception 'fixture_assertions: no claimable resolve_path_b task (pending, run_after due, not locked)';
   end if;
+  insert into public.tasks (kind, status, locked_until)
+  values ('resolve_path_b', 'pending', now() + interval '1 hour')
+  returning id into v_future_locked;
+  insert into public.tasks (kind, status, locked_until)
+  values ('resolve_path_b', 'pending', now() - interval '1 minute')
+  returning id into v_past_locked;
+  insert into public.tasks (kind, status, run_after)
+  values ('resolve_path_b', 'pending', now() + interval '1 hour')
+  returning id into v_future_dated;
+  if exists (
+    select 1 from public.tasks
+    where id = v_future_locked and status = 'pending' and run_after <= now()
+      and (locked_until is null or locked_until <= now())
+  ) then
+    raise exception 'fixture_assertions: future-locked task % reads as claimable', v_future_locked;
+  end if;
+  if not exists (
+    select 1 from public.tasks
+    where id = v_past_locked and status = 'pending' and run_after <= now()
+      and (locked_until is null or locked_until <= now())
+  ) then
+    raise exception 'fixture_assertions: past-locked task % does not read as claimable', v_past_locked;
+  end if;
+  if exists (
+    select 1 from public.tasks
+    where id = v_future_dated and status = 'pending' and run_after <= now()
+      and (locked_until is null or locked_until <= now())
+  ) then
+    raise exception 'fixture_assertions: future-dated task % reads as claimable', v_future_dated;
+  end if;
+  delete from public.tasks where id in (v_future_locked, v_past_locked, v_future_dated);
 end
 $$;
 
-select 'PASS: resolve_path_b task is claimable (status pending, run_after <= now())' as gate;
+select 'PASS: resolve_path_b task is claimable (status pending, run_after due, locked_until not in the future); future-locked and future-dated probes are not claimable' as gate;
 
 -- 7. assertions CHECK: a record cannot be asserted against itself -----------------
 
@@ -257,3 +301,110 @@ end
 $$;
 
 select 'PASS: assertions CHECK rejects a self-pair (same kind, same id)' as gate;
+
+-- 8. updated_at actually advances on UPDATE (D-R11 behavioural proof) ------------
+-- assertions.sql §11 asserts the trigger wiring exists; this section
+-- proves the behaviour end to end on two of the six tables (tasks,
+-- local_works): insert a probe row, update it in a LATER transaction,
+-- and require updated_at to have moved past created_at. The probes
+-- are three separate statements on purpose — now() is the
+-- transaction timestamp, so insert and update must not share one —
+-- with a pg_sleep between them for margin. Probes are deleted at
+-- the end; a failed assertion leaves them behind for debugging.
+
+do $$
+begin
+  insert into public.tasks (kind, status) values ('gate_probe_updated_at', 'pending');
+  insert into public.local_works (title) values ('gate probe updated_at');
+end
+$$;
+
+select pg_sleep(0.05);
+
+do $$
+declare
+  v_rows integer;
+begin
+  update public.tasks set attempts = attempts + 1 where kind = 'gate_probe_updated_at';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'fixture_assertions: updated_at probe task missing (update hit % rows)', v_rows;
+  end if;
+  update public.local_works set title = title where title = 'gate probe updated_at';
+  get diagnostics v_rows = row_count;
+  if v_rows <> 1 then
+    raise exception 'fixture_assertions: updated_at probe local_work missing (update hit % rows)', v_rows;
+  end if;
+end
+$$;
+
+do $$
+declare
+  v_created timestamptz;
+  v_updated timestamptz;
+begin
+  select created_at, updated_at into v_created, v_updated
+  from public.tasks where kind = 'gate_probe_updated_at';
+  if v_created is null then
+    raise exception 'fixture_assertions: updated_at probe task vanished before the check';
+  end if;
+  if not (v_updated > v_created) then
+    raise exception 'fixture_assertions: tasks.updated_at did not advance on UPDATE (created %, updated %)', v_created, v_updated;
+  end if;
+  select created_at, updated_at into v_created, v_updated
+  from public.local_works where title = 'gate probe updated_at';
+  if v_created is null then
+    raise exception 'fixture_assertions: updated_at probe local_work vanished before the check';
+  end if;
+  if not (v_updated > v_created) then
+    raise exception 'fixture_assertions: local_works.updated_at did not advance on UPDATE (created %, updated %)', v_created, v_updated;
+  end if;
+  delete from public.tasks where kind = 'gate_probe_updated_at';
+  delete from public.local_works where title = 'gate probe updated_at';
+end
+$$;
+
+select 'PASS: updated_at advances past created_at on UPDATE (tasks, local_works — D-R11 trigger behaviour)' as gate;
+
+-- 9. works CHECK: exactly one source ------------------------------------------------
+-- Both directions, like §6: a projection row naming BOTH a reference
+-- work and a local work, and one naming NEITHER, must both be
+-- rejected. (The constraint existed since PR 2 but had no rejection
+-- probe until this round — findings F13.)
+
+do $$
+declare
+  v_ref bigint;
+  v_local bigint;
+  v_inserted boolean := false;
+begin
+  select id into v_ref from public.ref_works
+    where source_key = 'fixture/effective-java';
+  select id into v_local from public.local_works where title = '红楼梦';
+  if v_ref is null or v_local is null then
+    raise exception 'fixture_assertions: works probe fixture lookup missed (ref_work=%, local_work=%)', v_ref, v_local;
+  end if;
+  begin
+    insert into public.works (work_ref_id, local_work_id, title)
+    values (v_ref, v_local, 'gate probe');
+    v_inserted := true;
+  exception when check_violation then
+    v_inserted := false;
+  end;
+  if v_inserted then
+    raise exception 'fixture_assertions: works insert with both sources set unexpectedly succeeded';
+  end if;
+  begin
+    insert into public.works (work_ref_id, local_work_id, title)
+    values (null, null, 'gate probe');
+    v_inserted := true;
+  exception when check_violation then
+    v_inserted := false;
+  end;
+  if v_inserted then
+    raise exception 'fixture_assertions: works insert with neither source set unexpectedly succeeded';
+  end if;
+end
+$$;
+
+select 'PASS: works CHECK rejects a row with both sources set and a row with neither source set' as gate;

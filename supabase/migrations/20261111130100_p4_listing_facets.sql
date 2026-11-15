@@ -25,6 +25,28 @@ create table public.listing_facets (
   updated_at timestamptz not null default now()
 );
 
+-- updated_at discipline (PR #63 review round 4, decision D-R11):
+-- updated_at columns in this series are maintained by trigger, never
+-- left to writers remembering to set them — without one, the column
+-- silently equals created_at forever. The shared trigger function is
+-- defined HERE, in the first migration that needs it; each later
+-- migration adds its own tables' triggers against this one function
+-- (130200: local_works, listing_links, tasks; 130300: works;
+-- 130400: review_aspects).
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger trg_listing_facets_set_updated_at
+  before update on public.listing_facets
+  for each row execute function public.set_updated_at();
+
 -- The backend and AI service connect as the table owner, which bypasses RLS.
 -- With RLS on and no policies, the public API keys can read and write nothing.
 alter table public.listing_facets enable row level security;

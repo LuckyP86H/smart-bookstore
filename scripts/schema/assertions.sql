@@ -249,6 +249,10 @@ $$;
 select 'PASS: ai_runs starts ''running'' with finished_at present; assertions kind/relation/level are NOT NULL' as gate;
 
 -- 10. tasks carries the plan §5 claim columns --------------------------------
+-- status (text, NOT NULL, default 'pending') is the sweep's filter:
+-- a NULL status satisfies no equality and the row would be invisible
+-- to its only consumer (PR #63 review round 4 — asserted here both in
+-- the catalog and with a live NULL-insert probe).
 -- priority (integer, NOT NULL, default 0) is how "resolve the fast
 -- sellers first" is said — the sweep claims ORDER BY priority.
 -- locked_until (timestamptz, nullable) is the claim visibility timeout:
@@ -259,7 +263,26 @@ declare
   v_type text;
   v_nullable text;
   v_default text;
+  v_inserted boolean := false;
 begin
+  select data_type, is_nullable, column_default into v_type, v_nullable, v_default
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'tasks' and column_name = 'status';
+  if v_type is null then
+    raise exception 'assertions: tasks.status is missing (plan §5)';
+  end if;
+  if v_type <> 'text' or v_nullable <> 'NO' or v_default is null or v_default not like '%pending%' then
+    raise exception 'assertions: tasks.status is % nullable=% default=%, expected text NOT NULL default ''pending''', v_type, v_nullable, v_default;
+  end if;
+  begin
+    insert into public.tasks (kind, status) values ('gate_probe', null);
+    v_inserted := true;
+  exception when not_null_violation then
+    v_inserted := false;
+  end;
+  if v_inserted then
+    raise exception 'assertions: tasks insert with NULL status unexpectedly succeeded';
+  end if;
   select data_type, is_nullable, column_default into v_type, v_nullable, v_default
   from information_schema.columns
   where table_schema = 'public' and table_name = 'tasks' and column_name = 'priority';
@@ -281,4 +304,44 @@ begin
 end
 $$;
 
-select 'PASS: tasks has priority (integer, NOT NULL, default 0) and locked_until (timestamptz, nullable) — plan §5' as gate;
+select 'PASS: tasks has status (text, NOT NULL, default ''pending''; NULL insert rejected), priority (integer, NOT NULL, default 0) and locked_until (timestamptz, nullable) — plan §5' as gate;
+
+-- 11. updated_at is trigger-maintained on all six tables that carry it --------
+-- listing_facets, local_works, listing_links, tasks, works and
+-- review_aspects each declare updated_at; D-R11 maintains the column
+-- with a BEFORE UPDATE trigger calling the shared
+-- public.set_updated_at() (defined in 20261111130100), so no writer
+-- has to remember it. The behavioural proof (an UPDATE actually
+-- advances updated_at) lives in fixture_assertions.sql §8; this
+-- section asserts the wiring exists on every one of the six.
+
+do $$
+declare
+  t text;
+begin
+  if not exists (
+    select 1 from pg_proc
+    where pronamespace = 'public'::regnamespace and proname = 'set_updated_at'
+  ) then
+    raise exception 'assertions: function public.set_updated_at() is missing (D-R11)';
+  end if;
+  foreach t in array array[
+    'listing_facets', 'local_works', 'listing_links', 'tasks', 'works', 'review_aspects'
+  ] loop
+    if not exists (
+      select 1
+      from pg_trigger tg
+      join pg_class c on c.oid = tg.tgrelid
+      join pg_proc p on p.oid = tg.tgfoid
+      where c.relname = t
+        and c.relnamespace = 'public'::regnamespace
+        and p.proname = 'set_updated_at'
+        and not tg.tgisinternal
+    ) then
+      raise exception 'assertions: table % has no set_updated_at trigger (D-R11)', t;
+    end if;
+  end loop;
+end
+$$;
+
+select 'PASS: set_updated_at() exists and a trigger calls it on all six updated_at tables (listing_facets, local_works, listing_links, tasks, works, review_aspects)' as gate;

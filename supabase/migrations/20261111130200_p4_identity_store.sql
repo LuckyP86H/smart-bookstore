@@ -33,6 +33,13 @@ create table public.local_works (
   updated_at timestamptz not null default now()
 );
 
+-- outcome is NOT NULL (PR #63 review round 4): the derivation reads
+-- filter evidence by outcome ('auto_linked' drives links, 'rejected'
+-- is the negative lineage), so a NULL-outcome row would be invisible
+-- to both — the same failure shape as tasks.status below. Every
+-- producer writes the outcome atomically with the bands (fixtures,
+-- the gate probes, PR 3's typed insertEvidence), so the constraint
+-- costs nothing today and a new migration later.
 create table public.evidence (
   id bigint generated always as identity primary key,
   listing_id bigint not null references public.books(id) on delete cascade,
@@ -44,7 +51,7 @@ create table public.evidence (
   weights jsonb,
   total_score numeric,
   model_version_id bigint references public.model_versions(id),
-  outcome text check (outcome in ('auto_linked', 'proposed', 'rejected')),
+  outcome text not null check (outcome in ('auto_linked', 'proposed', 'rejected')),
   created_at timestamptz not null default now(),
   constraint evidence_exactly_one_candidate check (
     (candidate_edition_id is not null)::int
@@ -128,13 +135,16 @@ create table public.identity_events (
 -- and the sweep claims ORDER BY priority. Status vocabulary: 'failed'
 -- is the terminal state (plan §5: terminal failed + last_error is the
 -- dead-letter list); 'dead' remains in the CHECK for vocabulary
--- compatibility but no producer writes it.
+-- compatibility but no producer writes it. status is NOT NULL
+-- (PR #63 review round 4): the sweep claims WHERE status = 'pending',
+-- and a NULL status satisfies no equality — the row would be
+-- invisible to the only consumer the table exists for.
 create table public.tasks (
   id bigint generated always as identity primary key,
   kind text not null,
   listing_id bigint references public.books(id) on delete set null,
   payload jsonb not null default '{}',
-  status text default 'pending' check (status in ('pending', 'claimed', 'done', 'failed', 'dead')),
+  status text not null default 'pending' check (status in ('pending', 'claimed', 'done', 'failed', 'dead')),
   priority integer not null default 0,
   attempts integer not null default 0,
   claimed_by text,
@@ -148,6 +158,21 @@ create table public.tasks (
 
 create index idx_assertions_left_right on public.assertions(left_kind, left_id, right_kind, right_id);
 create index idx_tasks_status_run_after on public.tasks(status, run_after);
+
+-- updated_at triggers (D-R11): the shared set_updated_at() function
+-- is defined in 20261111130100_p4_listing_facets.sql, the first
+-- migration that needs it.
+create trigger trg_local_works_set_updated_at
+  before update on public.local_works
+  for each row execute function public.set_updated_at();
+
+create trigger trg_listing_links_set_updated_at
+  before update on public.listing_links
+  for each row execute function public.set_updated_at();
+
+create trigger trg_tasks_set_updated_at
+  before update on public.tasks
+  for each row execute function public.set_updated_at();
 
 -- The backend and AI service connect as the table owner, which bypasses RLS.
 -- With RLS on and no policies, the public API keys can read and write nothing.

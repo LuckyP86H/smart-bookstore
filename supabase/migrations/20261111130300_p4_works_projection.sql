@@ -21,6 +21,12 @@ create table public.works (
   updated_at timestamptz not null default now()
 );
 
+-- updated_at trigger (D-R11): the shared set_updated_at() function
+-- is defined in 20261111130100_p4_listing_facets.sql.
+create trigger trg_works_set_updated_at
+  before update on public.works
+  for each row execute function public.set_updated_at();
+
 -- The backend and AI service connect as the table owner, which bypasses RLS.
 -- With RLS on and no policies, the public API keys can read and write nothing.
 alter table public.works enable row level security;

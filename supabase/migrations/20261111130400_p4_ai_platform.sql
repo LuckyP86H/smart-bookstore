@@ -77,6 +77,12 @@ create table public.review_aspects (
   updated_at timestamptz not null default now()
 );
 
+-- updated_at trigger (D-R11): the shared set_updated_at() function
+-- is defined in 20261111130100_p4_listing_facets.sql.
+create trigger trg_review_aspects_set_updated_at
+  before update on public.review_aspects
+  for each row execute function public.set_updated_at();
+
 -- The Act 3 extraction job's input (substrate only: no job in this PR).
 -- One row per review whose aspect extraction is still pending.
 create view public.review_aspects_queue as
