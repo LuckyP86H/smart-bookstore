@@ -17,8 +17,8 @@ every log the GIF renderer consumes comes from one harness run.
 | `scaffolding.sql` | **Environment replication, not a migration** — see the honesty note below. |
 | `fixtures.sql` | Synthetic gate data for the live-equivalent DB only (snapshot `fixture-2026-11-11`): two merchant stores + one customer store, listings covering the same-ISBN pair / lying ISBN, hyphen-variant and lowercase-x ISBN-10 variants, a NULL-ISBN 红楼梦， one sold listing, plus the reference catalogue, facets, evidence, assertions, links, task, prompts, ai_runs, works projection and review-aspects rows. Every store and listing is flagged `is_synthetic`. |
 | `assertions.sql` | Schema-level assertions (DO blocks that raise on failure, `PASS …` selects on success). No fixture dependency, so it runs against **both** DBs. |
-| `fixture_assertions.sql` | Data assertions: fixture row counts, the Path A control join, the lying-ISBN join, the three CHECK-rejection probes (evidence candidates, listing-link target shape, assertion self-pair), task claimability. Live-equivalent DB only. |
-| `make_gifs.py` | Renders the replay GIFs below from a gate run's logs (Pillow pinned in `requirements.txt`). Counts shown in the GIFs are read from the logs, never hardcoded. |
+| `fixture_assertions.sql` | Data assertions: fixture row counts, the Path A control join, the lying-ISBN join, the four CHECK-rejection probes (evidence candidates, listing-link target shape, assertion self-pair, works exactly-one-source), task claimability in both lock directions, and the `updated_at` trigger behaviour proof. Live-equivalent DB only. |
+| `make_gifs.py` | Renders the replay GIFs below from a gate run's logs (Pillow pinned in `requirements.txt`). Counts shown in the GIFs are derived, never hardcoded: PASS counts from the run's logs, and the assertions fraction's denominator from `assertions.sql`'s own section count, so a partial run renders as a partial fraction. |
 | `gifs/` | The four replay GIFs linked at the bottom of this README. |
 | `README.md` | This file. |
 
@@ -110,13 +110,15 @@ Exit code is 0 only when every gate step passes. Per-step output lands
 in the log directory: `fresh-setup.log`, `live-setup.log`,
 `assertions-fresh.log`, `assertions-live.log`, `fixture-assertions.log`,
 `dimensions.log`, `npm-test.log`, `noop-rerun.log`, and the running
-`gate.log`.
+`gate.log`. Every per-run log is truncated at the start of a run, so
+the log directory always holds exactly the latest run's output —
+nothing accumulates across runs.
 
 ## Watch it run (replays)
 
 Terminal replays rendered from the real run logs of the 2026-11-15 gate
 run (PostgreSQL 16.15 + pgvector 0.8.0, scratch cluster; the PR #63
-review round-3 run — 8/8 steps, 29 individual PASS lines) — each GIF
+review round-4 run — 8/8 steps, 33 individual PASS lines) — each GIF
 carries the disclosure in its footer; regenerate with
 `GATE_LOG_DIR=<log dir> python3 scripts/schema/make_gifs.py`
 (Pillow pinned in `scripts/schema/requirements.txt`).

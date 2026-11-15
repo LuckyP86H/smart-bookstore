@@ -84,6 +84,35 @@ Governing spec: `P4-BOOKS-FINAL-PLAN.md` §2, §3.6, §6, §9 Step 2, §12, §15
   from env and validates the returned dimension against 1024, throwing
   loud on mismatch. The `AI` binding is added to wrangler.jsonc; the
   container declarations are NOT touched (decision 12).
+- **D-R11 — `updated_at` is maintained by a shared trigger, not by
+  writers (2026-11-15, review round 4).** Six tables declare
+  `updated_at` (`listing_facets`, `local_works`, `listing_links`,
+  `tasks`, `works`, `review_aspects`) and nothing wrote it — the
+  column would have silently equalled `created_at` forever. Options
+  were a trigger or dropping the column; the trigger wins: the
+  schema's intent is evident (six tables independently declare the
+  column), and every future consumer will expect it to move. One
+  shared function, `public.set_updated_at()`, is defined in
+  20261111130100 (the first migration that needs it); each migration
+  adds the triggers for its own tables. The gate proves the wiring
+  (assertions.sql §11, all six) and the behaviour
+  (fixture_assertions.sql §8: an UPDATE advances `updated_at` past
+  `created_at` on probe rows).
+- **D-R12 — `evidence.outcome` is NOT NULL (2026-11-15, review
+  round 4).** Found by the round-4 sweep of nullable state columns,
+  applying the same criterion as the review's `tasks.status` item: a
+  column whose NULL makes the row invisible to its consumer. The
+  derivation reads filter evidence by outcome (`auto_linked` drives
+  links, `rejected` is the negative lineage), so a NULL-outcome row
+  would be invisible to both. Every producer writes the outcome
+  atomically with the bands (fixtures, the §4 gate probe, PR 3's
+  typed `insertEvidence`), so the constraint is free while the
+  migration is unapplied. The same sweep cleared the other two
+  nullable state columns deliberately: `listing_links.status` is
+  read as an attribute of a row looked up by `listing_id` (unique),
+  and `identity_events.event_type` belongs to an append-only log
+  whose rows are enumerated, not filtered — a NULL there loses an
+  attribute, it does not hide the row.
 
 ## Schema contract (what the migration files must implement)
 
@@ -126,6 +155,10 @@ Migration files (forward-only, repo naming convention, ordered):
      companion_marker boolean not null default false; language
      varchar(50); unified_book_number text (§3.1 witness identifier);
      updated_at.
+     (Round 4 addition, 2026-11-15: this file also defines the shared
+     `public.set_updated_at()` trigger function (D-R11) and the
+     `listing_facets` trigger; every later file adds its own tables'
+     triggers against that one function.)
 3. `20261111130200_p4_identity_store.sql`
    - `model_versions`: name text unique not null, weights jsonb,
      thresholds jsonb, comparison_defs jsonb, benchmark_results jsonb.
@@ -137,6 +170,9 @@ Migration files (forward-only, repo naming convention, ordered):
      null; weights jsonb; total_score numeric; model_version_id →
      model_versions; outcome text CHECK in
      ('auto_linked','proposed','rejected'); created_at.
+     (Correction 2026-11-15, review round 4: `outcome` is also
+     `not null` in the shipped migration — D-R12, the audit-found
+     sibling of the `tasks.status` fix below.)
    - `assertions`: left_kind/right_kind text not null CHECK in
      ('ref_work','ref_edition','local_work'), left_id/right_id bigint not
      null, relation text not null CHECK in ('same','not_same'), level
@@ -180,12 +216,22 @@ Migration files (forward-only, repo naming convention, ordered):
      The migration also gained a comment clarifying the status
      vocabulary: 'failed' is the terminal state (§5's dead-letter);
      'dead' stays in the CHECK but no producer writes it.
+     **Correction (2026-11-15, review round 4): `status` is now also
+     `not null`** in the shipped migration — a NULL-status task
+     satisfies no equality, so the sweep (`WHERE status = 'pending'`)
+     would never see the row. assertions.sql §10 asserts the
+     nullability/default in the catalog and proves it with a live
+     NULL-insert probe. This file's three `updated_at` tables
+     (`local_works`, `listing_links`, `tasks`) also gained their
+     D-R11 triggers here.
 4. `20261111130300_p4_works_projection.sql`
    - `works`: work_ref_id → ref_works unique nullable, local_work_id →
      local_works unique nullable, CHECK exactly one non-null; title text
      not null, author_display text, categories text[] not null default
      '{}', summary_en text, summary_zh text, created_at/updated_at.
      (Rollups are computed at read time per §3.6 — not stored.)
+     (Round 4 addition, 2026-11-15: the `works` D-R11
+     `set_updated_at` trigger is added in this file.)
 5. `20261111130400_p4_ai_platform.sql`
    - `prompts`: key text not null, version int not null, body text not
      null, description text, created_at; unique (key, version).
@@ -225,6 +271,8 @@ Migration files (forward-only, repo naming convention, ordered):
      ('pending','extracted','failed'); model text; created_at/updated_at.
      Plus view `review_aspects_queue` joining reviews + books (the Act 3
      extraction job's input — substrate only, D5: NO job in this PR).
+     (Round 4 addition, 2026-11-15: the `review_aspects` D-R11
+     `set_updated_at` trigger is added in this file.)
 
 ## Worker contract (`worker/src/ai/`)
 
@@ -324,6 +372,20 @@ Migration files (forward-only, repo naming convention, ordered):
   to, so a second run double-counted the dimension lines (31).
   `run_gate.sh` now truncates that log per run, and a cold re-run
   reports the same 29 (verified this round, from scratch and cold).
+  **Round 4 addendum (2026-11-15): the individual PASS-line count is
+  now 33** — assertions.sql grew §11 (the D-R11 trigger wiring), so
+  11 × 2 DBs, and fixture_assertions grew §8 (the `updated_at`
+  behaviour proof) and §9 (the `works` exactly-one-source rejection
+  probe), so 9, plus the dimension test's 2. Round 4 also closed the
+  append-mode wart for the remaining logs: `gate.log`,
+  `fresh-setup.log`, `live-setup.log` and `noop-rerun.log` are
+  truncated at the start of every run, so the log directory always
+  holds exactly one run. Verified by running the gate twice into the
+  same log directory: both runs report 8/8 steps and 33 PASS lines,
+  and the second run's setup logs contain none of the first run's
+  lines (zero `applying:` lines; the NO-OP prepare lines only) —
+  which is also what keeps `make_gifs.py`'s first-match picks on the
+  current run.
 - **§3.7 probe, measured:** `extensions.show_trgm('红楼梦')` returns
   exactly **4 trigrams** — the plan's quantitative claim ("a 3-character
   title yields ~4 trigrams") confirmed on the rehearsal DB (locale
@@ -336,7 +398,7 @@ Migration files (forward-only, repo naming convention, ordered):
   — round 1 added 5 tests for the ai_runs lifecycle and the payload
   pass-through (and updated 2 tests that had encoded the old
   stringified-payload contract). Typecheck still green.
-- **GIFs:** `scripts/schema/gifs/01…04` (0.09–0.23 MB), PIL-rendered
+- **GIFs:** `scripts/schema/gifs/01…04` (0.09–0.24 MB), PIL-rendered
   from the real gate/test logs by `scripts/schema/make_gifs.py`,
   disclosure footer on every frame, linked from `scripts/schema/README.md`
   ("Watch it run (replays)"). Final frames visually QC'd (CJK renders via
@@ -345,7 +407,11 @@ Migration files (forward-only, repo naming convention, ordered):
   the previous renderings were the round-1 run and showed 27 PASS
   lines / 9 assertion sections. `make_gifs.py` no longer hardcodes
   the assertions count — it reads it from the run's
-  `assertions-fresh.log`.)
+  `assertions-fresh.log`. Regenerated again 2026-11-15, review
+  round 4, from that round's run — 33 PASS lines / 11 assertion
+  sections; the fraction's denominator is now read from
+  `assertions.sql`'s own section count, so a partial run would
+  render as a partial fraction instead of n/n.)
 - **Round 3 (2026-11-15, PR #63 review): full claim audit of this
   log.** Every count in this log was re-verified by execution at head
   `a9d679a2`: vitest 140/140 (ai/ 17), typecheck green, gate from
@@ -357,6 +423,34 @@ Migration files (forward-only, repo naming convention, ordered):
   exits 0 printing the false PASS line. Scratch environment rebuilt
   again after a VM restart (PostgreSQL 16.15, pgvector 0.8.0 built
   from source, cluster `/tmp/pg2-scratch` port 54329).
+- **Round 4 (2026-11-15, PR #63 review): the four findings + two
+  nits, fixed with the same audit discipline.** (1) The append-mode
+  log wart is closed for all per-run logs, not just
+  `dimensions.log` — see the Round 4 gate addendum above for the
+  two-runs-one-log-directory proof. (2) `tasks.status` is NOT NULL
+  (contract correction above; assertions.sql §10 now asserts it in
+  the catalog and with a live NULL-insert probe). (3) `updated_at`
+  is trigger-maintained on all six tables (D-R11; wiring asserted
+  in assertions.sql §11, behaviour proven in
+  fixture_assertions.sql §8). (4) The §6 claimable probe now
+  applies the full §5 claim predicate — `locked_until` included —
+  and pins both directions with probe rows (future-locked and
+  future-dated tasks are NOT claimable; a past-locked one is). The
+  audit sweep beyond the findings: `evidence.outcome` gained NOT
+  NULL as the same-class sibling (D-R12); the `works`
+  exactly-one-source CHECK gained its missing rejection probe
+  (fixture_assertions.sql §9, closing finding F13);
+  `make_gifs.py`'s fraction denominator now comes from
+  `assertions.sql`'s section count; and `negative_test.sh`'s
+  variant-A failure path now prints the captured output inline
+  instead of referencing a path its own EXIT trap deletes
+  (failure path exercised with a renamed guard message: exit 1,
+  output dumped, no dangling path). Executed this round, at the
+  round-4 head: gate from scratch 8/8 steps / 33 PASS lines, cold
+  re-run into the same log directory 8/8 / 33, `negative_test.sh`
+  PASS, vitest 140/140, typecheck green. Scratch environment
+  rebuilt again after a VM restart (same recipe: PostgreSQL 16.15,
+  pgvector 0.8.0 from source, `/tmp/pg2-scratch` port 54329).
 - Scratch cluster shut down after the gate (D-R3).
 
 ## Child B — Worker half (`worker/src/ai/` + env/wrangler wiring)
@@ -520,6 +614,10 @@ Judgment calls beyond the contract, with reasons:
   an incomplete DB (interrupted run) is dropped+recreated for
   determinism, and `GATE_FRESH=1` forces drop+recreate. Each run
   also re-invokes the apply step internally to demonstrate the no-op.
+  (Correction 2026-11-15, review round 4: the re-run is not
+  assertions-only — the dimension test and `npm test` also re-run,
+  and the dimension test writes and deletes a probe row.
+  `run_gate.sh`'s header now says so too.)
 - **NOT NULL discipline:** only where the contract marks it, plus
   FK columns a row is meaningless without (evidence.listing_id,
   listing_links.listing_id, isbn_index.edition_ref_id,
@@ -527,6 +625,10 @@ Judgment calls beyond the contract, with reasons:
   tasks.status follows the contract literally (default + CHECK, no
   NOT NULL) where review_aspects/ai_runs status were contracted
   NOT NULL.
+  (Correction 2026-11-15, review round 4: `tasks.status` and
+  `evidence.outcome` both gained NOT NULL — the review's item and
+  the audit's sibling under the invisibility criterion; see the
+  round-4 contract corrections and D-R12.)
 - **Extra columns the contract's general timestamp rule implies:**
   created_at on the reference tables, isbn_index, model_versions,
   local_works and listing_facets (the contract lists timestamps
