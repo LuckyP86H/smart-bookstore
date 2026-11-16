@@ -64,6 +64,9 @@ node_modules/
 .wrangler/
 .dev.vars
 scripts/.seed-cloud.bundle.mjs
+scripts/seed/.link_seed.bundle.mjs
+scripts/seed/.verify_workpage.bundle.mjs
+scripts/seed/.verify_f3_rollback.bundle.mjs
 
 # Schema gate harness logs (scripts/schema/run_gate.sh)
 scripts/schema/gate-logs/

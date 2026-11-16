@@ -35,7 +35,7 @@ index cut here agrees with the full map by construction. One extra
 package over the PR 1 venv: ``pip install "psycopg[binary]"``.
 
 Usage:
-    DATA_DIR=~/workspace/review-scratch/smart-bookstore-p4-data \
+    DATA_DIR=<data-dir holding parquet/ + out/> \
     DATABASE_URL=postgres://user:pass@host:5432/dbname \
         <data-dir>/venv/bin/python scripts/seed/load_slice.py
 
@@ -274,6 +274,15 @@ def build_rows(data_dir: Path) -> dict:
         })
 
     for a in authors:
+        # Mirror of the Wikidata loop's guard below (PR #67 fix round
+        # item 8): authors with no usable name never enter
+        # author_rows/author_name_by_key and are never inserted, so
+        # their aliases must not be counted either — otherwise
+        # expected['ref_author_aliases'] counts rows the insert step
+        # filters out and the loader reports a phantom MISMATCH. With
+        # this guard, counted == inserted by construction.
+        if a["key"] not in author_name_by_key:
+            continue
         for alias in (a["alternate_names"] or []):
             add_alias(a["key"], alias, None, "openlibrary")
     for wd in wikidata:

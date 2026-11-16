@@ -80,6 +80,12 @@ def main(argv: list[str] | None = None) -> int:
                 ORDER BY b.case_id
                 """)
             print(f"b-mask cases with true edition in slice: {len(cases)}")
+            # Pinned in the fix round (PR #67 nit): D3-12 says the
+            # B-mask spot joins are EXACTLY 12 cases — assert the
+            # count itself, not just that all found cases resolve.
+            if len(cases) != 12:
+                failures.append(
+                    f"b-mask cases in slice: {len(cases)} != 12 (D3-12)")
             edition_isbns = {
                 key: canonical_set(i10, i13)
                 for key, i10, i13 in q(f"""
@@ -168,6 +174,27 @@ def main(argv: list[str] | None = None) -> int:
                         f"listing {listing_id}: linked edition "
                         f"{linked_edition} is not one of the editions "
                         f"{canon} names ({sorted(named)})")
+
+            # --- 4. rejected ISBN count, recomputed -------------------
+            # Pinned in the fix round (PR #67 nit): the loader REPORTS
+            # 29 checksum-rejected slice ISBNs but nothing asserted
+            # the number. Recompute it from the slice Parquet with the
+            # loader's own canonicalise (the PR 1 rules it ports),
+            # counting every raw isbn_13 / isbn_10 entry the loader
+            # would reject, exactly as load_slice.build_rows does.
+            rejected = 0
+            for i10, i13 in q(f"""
+                    SELECT isbn_10, isbn_13
+                    FROM '{parquet}/slice_editions.parquet'
+                    """):
+                for raw in list(i13 or []) + list(i10 or []):
+                    canon, _ = canonicalise(raw)
+                    if canon is None:
+                        rejected += 1
+            print(f"rejected ISBNs recomputed: {rejected}")
+            if rejected != 29:
+                failures.append(
+                    f"rejected ISBNs {rejected} != 29 (loader report)")
 
     for failure in failures:
         print(f"FAIL: {failure}")

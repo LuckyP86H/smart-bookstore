@@ -30,6 +30,22 @@ Path A code over them (scripts/seed/link_seed.ts, decision D3-10).
 Idempotency: if the seed stores already exist the generator reports
 and exits 0 without changing anything; --reset removes the seed
 stores/listings (and their sales, reviews, links and events) first.
+NOTE on --reset: ``ai_runs`` rows that referenced the deleted
+listings are NOT removed — the schema's ``listing_id`` foreign key is
+ON DELETE SET NULL, so finished run records survive a reset with
+``listing_id`` NULL. That is deliberate (ai_runs is the observability
+ledger, §3.6), but it means a reset gate database still contains the
+previous run's ai_runs rows.
+
+Staging guard (PR #67 fix round item 6): the seed accounts this
+script creates CANNOT log in — it stores the plaintext
+``SEED_PASSWORD`` while production ``verifyPassword`` parses the
+stored record as a PHC string and rejects plaintext as malformed.
+The accounts are data fixtures for the catalogue/linking gate, not
+credentials. Because the script runs against whatever DATABASE_URL
+it is given, it REFUSES to run unless an explicit staging
+confirmation is present: pass ``--staging`` or set
+``SEED_STAGING_CONFIRM=staging`` in the environment.
 
 Connection via DATABASE_URL only, like the loader.
 """
@@ -89,6 +105,48 @@ def canonicalise10(raw: str) -> str:
     return core + str(_isbn13_check_digit(core))
 
 
+def _norm_agree(text: str) -> str:
+    """Mirror of the Worker's normalizeForAgreement (agreement.ts):
+    lowercase, non-alphanumeric runs to spaces, whitespace collapsed."""
+    return re.sub(r"\s+", " ",
+                  re.sub(r"[^\w]+", " ", (text or "").lower(),
+                         flags=re.UNICODE)).strip()
+
+
+def donor_would_agree(donor_title: str, donor_author: str,
+                      edition_title: str, work_title: str,
+                      hub_author: str) -> bool:
+    """True when the lying archetype's donor metadata would PASS the
+    Worker's agreement guard against the hub edition (title band not
+    mismatch AND author band not mismatch, mirroring bandsPass). If
+    it ever passed, the 'lying' listing would auto-link and the
+    archetype would silently stop testing the guard — so the
+    generator checks at generation time and fails fast, instead of
+    waiting for the gate's §4 assertion to notice."""
+    listing = _norm_agree(donor_title)
+    title_band = "mismatch"
+    if listing:
+        for cand in (edition_title, work_title):
+            ref = _norm_agree(cand or "")
+            if not ref:
+                continue
+            if ref == listing:
+                title_band = "exact"
+                break
+            if (len(listing) >= 5 and len(ref) >= 5
+                    and (listing in ref or ref in listing)):
+                title_band = "partial"
+    if not (hub_author or "").strip() or not (donor_author or "").strip():
+        author_band = "unknown"
+    elif _norm_agree(donor_author) == _norm_agree(hub_author):
+        author_band = "exact"
+    else:
+        lt = {t for t in _norm_agree(donor_author).split(" ") if len(t) >= 2}
+        dt = {t for t in _norm_agree(hub_author).split(" ") if len(t) >= 2}
+        author_band = "partial" if lt & dt else "mismatch"
+    return title_band != "mismatch" and author_band != "mismatch"
+
+
 def pick_from_parquet(data_dir: Path, snapshot_isbns: set[str]):
     """The two archetypes the ref tables cannot express alone: a raw
     ISBN-10 ending in X (the raw form is not stored in ref_editions)
@@ -125,8 +183,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--snapshot-id",
                         default=os.environ.get("SNAPSHOT_ID"))
     parser.add_argument("--reset", action="store_true",
-                        help="delete existing seed data first")
+                        help="delete existing seed data first (ai_runs "
+                             "rows survive with listing_id NULL — see "
+                             "the module docstring)")
+    parser.add_argument("--staging", action="store_true",
+                        help="required staging confirmation: the seed "
+                             "accounts are non-login data fixtures and "
+                             "this script writes to whatever DATABASE_URL "
+                             "names; alternatively set "
+                             "SEED_STAGING_CONFIRM=staging")
     args = parser.parse_args(argv)
+    if not args.staging and \
+            os.environ.get("SEED_STAGING_CONFIRM") != "staging":
+        print("ERROR: refusing to run without a staging confirmation: "
+              "pass --staging or set SEED_STAGING_CONFIRM=staging. "
+              "This script writes fixture stores/listings (whose "
+              "accounts cannot log in) to whatever DATABASE_URL names "
+              "— confirm that database is a staging/scratch target.",
+              file=sys.stderr)
+        return 2
     if not args.database_url:
         print("ERROR: set DATABASE_URL", file=sys.stderr)
         return 2
@@ -223,7 +298,28 @@ def main(argv: list[str] | None = None) -> int:
                       file=sys.stderr)
                 return 1
             e1, e2 = hub_editions[0], hub_editions[1]
-            e3 = hub_editions[2] if len(hub_editions) > 2 else e2
+            # Donor agreement check (generation time, not gate time):
+            # the lying archetype only tests the guard while its donor
+            # metadata DISAGREES with the hub edition it impersonates.
+            if donor_would_agree(donor_title, donor_author,
+                                 e1[1] or "", hub_title, hub_author):
+                print(f"ERROR: donor work {donor_title!r} by "
+                      f"{donor_author} AGREES with the hub edition "
+                      f"{e1[1]!r} by {hub_author} under the agreement "
+                      f"guard — the lying-ISBN archetype would "
+                      f"auto-link instead of demoting. Pick a different "
+                      f"donor.", file=sys.stderr)
+                return 1
+            if len(hub_editions) > 2:
+                e3 = hub_editions[2]
+            else:
+                e3 = e2
+                print("WARNING: hub work has exactly 2 ISBN'd editions "
+                      "— the 'hub-edition-3' archetype will DUPLICATE "
+                      "edition 2 instead of using a third edition. "
+                      "The gate's hub assertions (>=2 editions) still "
+                      "hold, but the archetype is degraded.",
+                      file=sys.stderr)
             hyphen_edition = third_editions[0]
 
             cur.execute(

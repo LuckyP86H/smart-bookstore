@@ -25,6 +25,12 @@ begin
   if (select count(*) from ref_authors) <> 5070 then
     raise exception 'assertions: ref_authors count %', (select count(*) from ref_authors);
   end if;
+  -- Pinned in the fix round (PR #67 nit): the alias total was stated
+  -- in the docs but only ever checked against the loader's own
+  -- self-derived expectation; this file is the independent reader.
+  if (select count(*) from ref_author_aliases) <> 21597 then
+    raise exception 'assertions: ref_author_aliases count %', (select count(*) from ref_author_aliases);
+  end if;
   if (select count(*) from ref_works) <> 4993 then
     raise exception 'assertions: ref_works count %', (select count(*) from ref_works);
   end if;
@@ -46,7 +52,7 @@ begin
 end
 $$;
 
-select 'PASS: loaded counts equal the manifest (5070/4993/20000/13940/4993), one snapshot' as gate;
+select 'PASS: loaded counts equal the manifest (5070/21597/4993/20000/13940/4993), one snapshot' as gate;
 
 -- 2. seed shape: 4 synthetic stores, 8 synthetic listings --------------------
 
@@ -97,6 +103,20 @@ begin
            or r.output is null)
   ) then
     raise exception 'assertions: a derivation ai_run is missing or unfinished';
+  end if;
+  -- Fix round item 15: the README/PR claim "ai_runs payloads are
+  -- verified jsonb objects" is now actually verified. A
+  -- double-encoded payload (a JSON string scalar — exactly the bug
+  -- PR #63's rounds caught in ai/runs.ts) has jsonb_typeof 'string'
+  -- and must fail here, for BOTH input and output.
+  if exists (
+    select 1 from listing_links ll join books b on b.id = ll.listing_id
+    join ai_runs r on r.id = ll.derivation_run_id
+    where b.is_synthetic
+      and (jsonb_typeof(r.input) <> 'object'
+           or jsonb_typeof(r.output) <> 'object')
+  ) then
+    raise exception 'assertions: a derivation ai_run payload is not a jsonb object (double-encoded?)';
   end if;
   if (select count(*) from identity_events ev join books b
         on b.id = ev.listing_id
@@ -250,3 +270,99 @@ end
 $$;
 
 select 'PASS: sold listing carries its sale, 5-star review, and counters' as gate;
+
+-- 9. F1: review_aspects_queue runs with invoker rights (fix round item 5) -----
+
+do $$
+declare
+  v_sold bigint;
+  v_customer bigint;
+  v_review bigint;
+  v_invoker_blocked boolean := false;
+  v_owner_count integer := -1;
+  v_n integer;
+begin
+  -- (a) catalog: the shipped view (migration 20261111130500) carries
+  -- security_invoker in its reloptions.
+  if not exists (
+    select 1 from pg_class
+    where relname = 'review_aspects_queue' and relkind = 'v'
+      and reloptions is not null
+      and 'security_invoker=true' = any (reloptions)
+  ) then
+    raise exception 'assertions: review_aspects_queue lacks security_invoker=true in pg_class.reloptions';
+  end if;
+
+  -- (b) functional probe that distinguishes the two semantics. A
+  -- probe role is granted SELECT on the view but has NO access to the
+  -- underlying tables (which are RLS-enabled with no policies):
+  --   * through the shipped (invoker) view its query must be REFUSED;
+  --   * through an identical owner-semantics probe view it must
+  --     ANSWER (the owner bypasses the underlying restrictions) —
+  --     proving the probe can tell the two apart on THIS database.
+  -- A pending review_aspects row is planted so the owner view has
+  -- something to return; all probe artifacts are removed before the
+  -- block ends (the gate DB is throwaway, but verify_workpage runs
+  -- after this file against the same database).
+  -- Any synthetic listing with no review yet (reviews is unique on
+  -- (book_id, customer_id) and the sold listing already carries the
+  -- seed customer's review).
+  select b.id into v_sold from books b
+  where b.is_synthetic
+    and not exists (select 1 from reviews r where r.book_id = b.id)
+  order by b.id limit 1;
+  select id into v_customer from stores where username = 'seed-customer';
+  if v_sold is null or v_customer is null then
+    raise exception 'assertions: F1 probe fixtures missing (reviewless listing / seed customer)';
+  end if;
+  insert into reviews (book_id, customer_id, rating, review_text)
+  values (v_sold, v_customer, 4, 'gate F1 probe review')
+  returning id into v_review;
+  insert into review_aspects (review_id, status) values (v_review, 'pending');
+
+  if not exists (select 1 from pg_roles where rolname = 'sb_gate_probe') then
+    execute 'create role sb_gate_probe nologin';
+  end if;
+  -- The control view repeats the queue's base query WITHOUT
+  -- security_invoker, so it runs with owner semantics.
+  execute $v$create view public.sb_gate_probe_owner_view as
+    select ra.id as review_aspects_id, ra.status as aspects_status,
+           r.id as review_id, r.book_id, r.customer_id, r.rating,
+           r.review_text, r.created_at as review_created_at,
+           b.store_id, b.title as book_title, b.author as book_author
+    from public.review_aspects ra
+    join public.reviews r on r.id = ra.review_id
+    join public.books b on b.id = r.book_id
+    where ra.status = 'pending'$v$;
+  execute 'grant select on public.review_aspects_queue to sb_gate_probe';
+  execute 'grant select on public.sb_gate_probe_owner_view to sb_gate_probe';
+
+  execute 'set role sb_gate_probe';
+  begin
+    select count(*) into v_n from public.review_aspects_queue;
+  exception when others then
+    v_invoker_blocked := true;
+  end;
+  begin
+    select count(*) into v_owner_count from public.sb_gate_probe_owner_view;
+  exception when others then
+    v_owner_count := -2;
+  end;
+  execute 'reset role';
+
+  execute 'revoke select on public.review_aspects_queue from sb_gate_probe';
+  execute 'revoke select on public.sb_gate_probe_owner_view from sb_gate_probe';
+  execute 'drop view public.sb_gate_probe_owner_view';
+  delete from review_aspects where review_id = v_review;
+  delete from reviews where id = v_review;
+
+  if not v_invoker_blocked then
+    raise exception 'assertions: probe role could read review_aspects_queue — view is NOT running with invoker rights';
+  end if;
+  if v_owner_count < 1 then
+    raise exception 'assertions: probe control failed — owner-semantics view returned % (expected >= 1); the probe cannot distinguish the semantics', v_owner_count;
+  end if;
+end
+$$;
+
+select 'PASS: review_aspects_queue has security_invoker=true and refuses a role without underlying access (owner-semantics control answers)' as gate;

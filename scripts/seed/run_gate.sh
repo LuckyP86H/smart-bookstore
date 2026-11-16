@@ -6,17 +6,26 @@
 # starts from a deterministic state):
 #
 #   scaffolding (scripts/schema/scaffolding.sql)
-#   -> all 8 migrations in filename order (3 existing + PR 2's 5)
+#   -> all migrations in filename order (3 existing + PR 2's 5 + the
+#      PR 3 fix round's F1 security_invoker migration = 9)
 #   -> seed loader, run 1   (counts must equal the slice manifest)
 #   -> seed loader, run 2   (insert-if-absent proof: inserted=0 x6)
 #   -> synthetic generator  (8 archetype listings, is_synthetic)
 #   -> link_seed.ts         (the Worker's own Path A linker, bundled
 #                            with esbuild like scripts/seed-cloud)
-#   -> assertions.sql       (link/evidence/demotion/count assertions)
+#   -> assertions.sql       (link/evidence/demotion/count assertions,
+#                            ai_runs jsonb-object checks, F1 invoker
+#                            probe)
 #   -> spot_joins.py        (independent recomputation: PR 1's B-mask
 #                            spot joins + synthetic ISBN resolution)
 #   -> verify_workpage.ts   (the real GetWork RPC through the Connect
 #                            router against the seeded database)
+#   -> verify_f3_rollback.ts (F3 option C against the REAL database:
+#                            a forced link failure inside the shipped
+#                            linker leaves exactly one finished
+#                            'error' ai_run and zero listing_links —
+#                            the real-Postgres step DEPLOY.md's P3
+#                            section anticipated; fix round item 14)
 #
 # The vitest suite, typecheck, and the frontend production build are
 # repo-level gates, run separately (npm test / npm run typecheck /
@@ -102,6 +111,7 @@ PSQL_DB=(psql -d "$SEED_DB" -v ON_ERROR_STOP=1 -q)
 record "fresh scratch database $SEED_DB" $?
 
 # --- 1. scaffolding + migrations ------------------------------------------
+N_MIGRATIONS=$(ls "$MIGRATIONS_DIR"/*.sql | wc -l)
 {
   "${PSQL_DB[@]}" -f "$SCAFFOLDING" || exit 1
   for f in "$MIGRATIONS_DIR"/*.sql; do
@@ -109,7 +119,7 @@ record "fresh scratch database $SEED_DB" $?
     "${PSQL_DB[@]}" -f "$f" || exit 1
   done
 } > "$LOG_DIR/01-migrations.log" 2>&1
-record "scaffolding + 8 migrations" $?
+record "scaffolding + $N_MIGRATIONS migrations" $?
 
 # --- 2/3. loader, twice ----------------------------------------------------
 run_step "loader run 1 (manifest counts)" 02-loader-run1.log \
@@ -129,7 +139,7 @@ fi
 # --- 4. synthetic generator --------------------------------------------------
 run_step "synthetic generator" 04-generator.log \
   env DATA_DIR="$DATA_DIR" DATABASE_URL="$DATABASE_URL" \
-  "$PYTHON" "$SCRIPT_DIR/generate_synthetic.py"
+  "$PYTHON" "$SCRIPT_DIR/generate_synthetic.py" --staging
 
 # --- 5. link the seed listings with the shipped Path A code ------------------
 (
@@ -158,8 +168,18 @@ run_step "spot_joins.py (B-mask + synthetic resolution)" 07-spot-joins.log \
 ) > "$LOG_DIR/08-verify-workpage.log" 2>&1
 record "verify_workpage (real GetWork RPC, seeded DB)" $?
 
+# --- 9. F3 compensating run against the real database -------------------------
+(
+  cd "$REPO_ROOT" || exit 1
+  npx esbuild scripts/seed/verify_f3_rollback.ts --bundle --platform=node \
+    --format=esm --outfile=scripts/seed/.verify_f3_rollback.bundle.mjs || exit 1
+  DATABASE_URL="$DATABASE_URL" node scripts/seed/.verify_f3_rollback.bundle.mjs
+) > "$LOG_DIR/09-verify-f3-rollback.log" 2>&1
+record "verify_f3_rollback (real-DB F3 compensating ai_run)" $?
+
 rm -f "$REPO_ROOT/scripts/seed/.link_seed.bundle.mjs" \
-      "$REPO_ROOT/scripts/seed/.verify_workpage.bundle.mjs"
+      "$REPO_ROOT/scripts/seed/.verify_workpage.bundle.mjs" \
+      "$REPO_ROOT/scripts/seed/.verify_f3_rollback.bundle.mjs"
 
 note "=================================================="
 note "GATE SUMMARY: $PASS_STEPS passed, $FAIL_STEPS failed"
