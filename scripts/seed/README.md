@@ -168,7 +168,7 @@ it. **Nothing here has touched the live database.**
   across stores, with synthetic listings badged as demo data. The
   divergence is also recorded in `DEPLOY.md`.
 
-## Gate results (local, fix-round run 2026-11-16 at `HEAD_TO_FILL`; originally run 2026-11-12, push-pass run 2026-11-15)
+## Gate results (local, fix-round run 2026-11-16 at `d753dbc`; originally run 2026-11-12, push-pass run 2026-11-15)
 
 > **Dated correction (2026-11-16, fix round item 4):** the previous
 > version of this section cited commit `efdec56` as the executed
@@ -189,7 +189,7 @@ RPC returned the hub work merged across stores with the sold
 listing's review attributed (edition attribution + synthetic flag
 checked), and the new real-DB F3 step proved the compensating
 `error` ai_run behaviour against Postgres itself. Repo gates
-alongside: vitest VITEST_TO_FILL, typecheck clean, frontend
+alongside: vitest 197/197, typecheck clean, frontend
 production build green (zero `localhost` strings in the output),
 proto regeneration byte-identical.
 
