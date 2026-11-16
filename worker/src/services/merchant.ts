@@ -22,6 +22,7 @@ import {
 import { InvalidISBNError, normalizeISBN } from "../external/isbn";
 import {
   lookupOlBookInfo,
+  type OlBookInfo,
   type OlEditionInfo,
 } from "../external/open-library";
 import { canonicalISBN13 } from "../identity/isbn13";
@@ -97,6 +98,17 @@ export interface MerchantServiceDeps {
     begin: TransactionRunner;
     lookupEdition?: (isbn13: string) => Promise<OlEditionInfo | null>;
   };
+  /**
+   * The throttled + memoised Open Library prefill lookup
+   * (createOpenLibraryBookInfoLookup: ≤3 req/s, 10-minute cache,
+   * negatives included). Production wiring (connect-app.ts) always
+   * supplies the shared per-isolate instance — LookupBookByISBN is a
+   * PUBLIC endpoint, and calling the raw lookupOlBookInfo from it
+   * would let a burst get the Worker's egress IP rate-limited by OL
+   * and break the Path A fallback too (PR #67 fix round item 2). When
+   * absent (unit seams), the raw lookup is used with `fetchFn`.
+   */
+  lookupBookInfo?: (isbn13: string) => Promise<OlBookInfo | null>;
   fetchFn?: typeof fetch;
 }
 
@@ -266,9 +278,14 @@ export function createMerchantService(
         console.log(`Local ISBN prefill for ${isbn13} failed:`, err);
       }
 
-      // 2. Open Library — open data, attributed, submittable.
+      // 2. Open Library — open data, attributed, submittable. Routed
+      // through the shared throttled + memoised lookup when wired
+      // (production always wires it; see MerchantServiceDeps).
       try {
-        const ol = await lookupOlBookInfo(isbn13, { fetchFn: deps.fetchFn });
+        const ol =
+          deps.lookupBookInfo !== undefined
+            ? await deps.lookupBookInfo(isbn13)
+            : await lookupOlBookInfo(isbn13, { fetchFn: deps.fetchFn });
         if (ol !== null) {
           return create(LookupBookByISBNResponseSchema, {
             title: ol.title,

@@ -30,7 +30,9 @@ import {
 } from "./db/client";
 import type { Env } from "./env";
 import {
+  createOpenLibraryBookInfoLookup,
   createOpenLibraryEditionLookup,
+  type OlBookInfo,
   type OlEditionInfo,
 } from "./external/open-library";
 import { CustomerService, MerchantService } from "./gen/bookstore_pb";
@@ -62,6 +64,13 @@ export interface ServeConnectOptions {
   pathA?: {
     lookupEdition?: (isbn13: string) => Promise<OlEditionInfo | null>;
   };
+  /**
+   * P4 §4.6 prefill: the throttled + memoised Open Library BookInfo
+   * lookup the public LookupBookByISBN endpoint must use (≤3 req/s,
+   * 10-minute cache incl. negatives). handleConnectRequest wires the
+   * shared per-isolate instance; tests may inject their own.
+   */
+  bookInfoLookup?: (isbn13: string) => Promise<OlBookInfo | null>;
   /**
    * HTTP implementation for the prefill lookups (Open Library / Google
    * Books). Tests inject a stub; production uses the global fetch.
@@ -107,6 +116,7 @@ export async function serveConnectRequest(
             }
           : undefined,
       fetchFn: options.fetchFn,
+      lookupBookInfo: options.bookInfoLookup,
     }),
   );
   router.service(
@@ -137,6 +147,10 @@ export async function serveConnectRequest(
 // lookup results are decision inputs, never persisted data).
 const sharedOpenLibraryLookup = createOpenLibraryEditionLookup();
 
+// The same treatment for the public prefill path: one throttled,
+// memoised BookInfo lookup per isolate (PR #67 fix round item 2).
+const sharedOpenLibraryBookInfoLookup = createOpenLibraryBookInfoLookup();
+
 /** Worker entry point: one Hyperdrive-backed client per request. */
 export async function handleConnectRequest(
   request: Request,
@@ -150,6 +164,7 @@ export async function handleConnectRequest(
         ctx !== undefined ? (promise) => ctx.waitUntil(promise) : undefined,
       begin: db.begin,
       pathA: { lookupEdition: sharedOpenLibraryLookup },
+      bookInfoLookup: sharedOpenLibraryBookInfoLookup,
     });
   } finally {
     await db.close().catch(() => undefined);

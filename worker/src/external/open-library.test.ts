@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createOpenLibraryBookInfoLookup,
   createOpenLibraryEditionLookup,
   lookupEditionByISBN,
   lookupOlBookInfo,
@@ -108,6 +109,77 @@ describe("lookupOlBookInfo", () => {
         fetchFn: routerFetch({}) as typeof fetch,
       }),
     ).toBeNull();
+  });
+});
+
+describe("createOpenLibraryBookInfoLookup (prefill: rate limit + memoisation)", () => {
+  it("memoises hits and misses; spaces EVERY underlying request by >= 334ms", async () => {
+    let fetches = 0;
+    const fetchFn = async (input: RequestInfo | URL) => {
+      fetches += 1;
+      const url = String(input);
+      if (url.includes("9780134685991")) {
+        return new Response(JSON.stringify(EDITION_JSON), { status: 200 });
+      }
+      if (url.includes("/works/")) {
+        return new Response(JSON.stringify(WORK_JSON), { status: 200 });
+      }
+      if (url.includes("/authors/")) {
+        return new Response(JSON.stringify(AUTHOR_JSON), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    };
+    let clock = 1_000_000;
+    const sleeps: number[] = [];
+    const lookup = createOpenLibraryBookInfoLookup({
+      fetchFn: fetchFn as typeof fetch,
+      now: () => clock,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock += ms;
+      },
+    });
+
+    // One prefill lookup = edition + work + author = 3 requests; the
+    // first is unspaced (cold limiter), the other two each wait 334ms.
+    const first = await lookup("9780134685991");
+    expect(first?.title).toBe("Effective Java");
+    expect(first?.author).toBe("Joshua Bloch");
+    expect(fetches).toBe(3);
+    expect(sleeps).toEqual([334, 334]);
+
+    // Second call for the same ISBN: full cache hit — no fetch, no sleep.
+    expect(await lookup("9780134685991")).toEqual(first);
+    expect(fetches).toBe(3);
+    expect(sleeps).toEqual([334, 334]);
+
+    // A new ISBN pays spacing again (its single edition request 404s).
+    expect(await lookup("9780000000002")).toBeNull();
+    expect(fetches).toBe(4);
+    expect(sleeps).toEqual([334, 334, 334]);
+
+    // The miss is memoised too (negatives included).
+    expect(await lookup("9780000000002")).toBeNull();
+    expect(fetches).toBe(4);
+  });
+
+  it("does not cache errors — a transient failure can be retried", async () => {
+    let fetches = 0;
+    const fetchFn = async () => {
+      fetches += 1;
+      if (fetches === 1) {
+        return new Response("down", { status: 503 });
+      }
+      return new Response(JSON.stringify(EDITION_JSON), { status: 200 });
+    };
+    const lookup = createOpenLibraryBookInfoLookup({
+      fetchFn: fetchFn as typeof fetch,
+      minIntervalMs: 0,
+    });
+    await expect(lookup("9780134685991")).rejects.toThrow(/503/);
+    const retry = await lookup("9780134685991");
+    expect(retry?.title).toBe("Effective Java");
+    expect(fetches).toBeGreaterThan(1);
   });
 });
 

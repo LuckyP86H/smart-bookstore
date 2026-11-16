@@ -9,13 +9,20 @@
 //   * Covers follow §4.5: the cover URL is LINKED, never stored or
 //     proxied (`covers.openlibrary.org/b/isbn/<isbn>-L.jpg`).
 //
-// Two entry points:
+// Entry points:
 //   lookupEditionByISBN — the Path A fallback (§3.1): one identified
 //     ISBN lookup when the local index misses. Rate-limited to at most
 //     3 requests/second (createOpenLibraryEditionLookup) and memoised
 //     per isolate with a TTL, negatives included.
 //   lookupOlBookInfo — the prefill source (§4.6): edition + work +
-//     author reads assembled into the BookInfo shape.
+//     author reads assembled into the BookInfo shape. The RAW function
+//     is unthrottled and unmemoised (up to 5 sequential requests per
+//     call); serving code must call it through
+//     createOpenLibraryBookInfoLookup, which applies the same
+//     ≤3 req/s + 10-minute memoised policy as the Path A lookup
+//     (PR #67 fix round item 2: the public prefill endpoint previously
+//     called the raw function directly, so a burst could get the
+//     Worker's egress IP rate-limited by OL and break Path A too).
 
 export const OPEN_LIBRARY_USER_AGENT =
   "smart-bookstore-worker/1.0 (Open Library ISBN lookup; " +
@@ -200,6 +207,64 @@ export interface EditionLookupOptions extends OpenLibraryOptions {
   minIntervalMs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * The prefill lookup (§4.6) under the SAME policy as the Path A
+ * fallback above: memoised per isolate for 10 minutes, negatives
+ * included, and every underlying HTTP request (a BookInfo lookup makes
+ * up to 5: edition + work + up to 3 authors) is serialised through one
+ * chain and spaced by at least 334ms from the previous request, so the
+ * public prefill path can never exceed ≤3 req/s against Open Library
+ * or starve Path A. Errors are not cached (a transient failure may be
+ * retried by the next caller); a 404-shaped miss IS cached, as the
+ * null result. connect-app.ts holds one shared instance per isolate.
+ */
+export function createOpenLibraryBookInfoLookup(
+  options: EditionLookupOptions = {},
+): (isbn13: string) => Promise<OlBookInfo | null> {
+  const ttl = options.cacheTtlMs ?? 10 * 60 * 1000;
+  const minInterval = options.minIntervalMs ?? 334;
+  const now = options.now ?? (() => Date.now());
+  const sleep =
+    options.sleep ??
+    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const cache = new Map<string, { at: number; value: OlBookInfo | null }>();
+  let chain: Promise<unknown> = Promise.resolve();
+  let lastCallAt = 0;
+
+  const baseFetch = options.fetchFn ?? fetch;
+  const throttledFetch: typeof fetch = ((
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => {
+    const task = chain.then(async () => {
+      const wait = Math.max(0, minInterval - (now() - lastCallAt));
+      if (wait > 0) {
+        await sleep(wait);
+      }
+      try {
+        return await baseFetch(input, init);
+      } finally {
+        lastCallAt = now();
+      }
+    });
+    chain = task.catch(() => undefined);
+    return task;
+  }) as typeof fetch;
+
+  return async (isbn13: string): Promise<OlBookInfo | null> => {
+    const hit = cache.get(isbn13);
+    if (hit !== undefined && now() - hit.at < ttl) {
+      return hit.value;
+    }
+    const value = await lookupOlBookInfo(isbn13, {
+      ...options,
+      fetchFn: throttledFetch,
+    });
+    cache.set(isbn13, { at: now(), value });
+    return value;
+  };
 }
 
 /**

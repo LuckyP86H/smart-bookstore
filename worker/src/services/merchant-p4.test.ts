@@ -173,6 +173,46 @@ describe("LookupBookByISBN prefill order (§4.6)", () => {
     expect(String(json.attribution)).toContain("Google Books");
   });
 
+  it("routes the OL step through the injected throttled lookup, never the raw fetch (fix round item 2)", async () => {
+    const capture: string[] = [];
+    const seen: string[] = [];
+    const run: QueryRunner = async () => [];
+    const response = await serveConnectRequest(
+      rpc("MerchantService", "LookupBookByISBN", { isbn: "9780134685991" }),
+      ENV,
+      run,
+      {
+        checker: createTestDoubleCredentialChecker(),
+        fetchFn: olFetch(capture) as typeof fetch,
+        bookInfoLookup: async (isbn13) => {
+          seen.push(isbn13);
+          return {
+            title: "Effective Java",
+            author: "Joshua Bloch",
+            publisher: "Addison-Wesley Professional",
+            publicationYear: 2018,
+            pageCount: 412,
+            description: "OL description.",
+            coverImageUrl:
+              "https://covers.openlibrary.org/b/isbn/9780134685991-L.jpg",
+            categories: ["Java"],
+          };
+        },
+      },
+    );
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { [key: string]: any };
+    expect(json).toMatchObject({
+      source: "open_library",
+      attribution: "Open Library",
+      description: "OL description.",
+    });
+    // The throttled lookup saw exactly the canonical ISBN, and the raw
+    // fetch was never touched for Open Library (or Google — OL hit).
+    expect(seen).toEqual(["9780134685991"]);
+    expect(capture).toHaveLength(0);
+  });
+
   it("is still NotFound when no source knows the ISBN", async () => {
     const run: QueryRunner = async () => [];
     const nothing = async (input: RequestInfo | URL) => {
