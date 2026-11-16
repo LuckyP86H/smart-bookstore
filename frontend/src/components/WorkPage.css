@@ -68,6 +68,11 @@
   font-weight: 600;
 }
 
+.work-review-rating {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
 .work-review-meta {
   color: var(--text-secondary, #666);
   font-size: 0.9rem;
