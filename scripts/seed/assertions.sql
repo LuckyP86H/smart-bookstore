@@ -109,12 +109,17 @@ begin
   -- double-encoded payload (a JSON string scalar — exactly the bug
   -- PR #63's rounds caught in ai/runs.ts) has jsonb_typeof 'string'
   -- and must fail here, for BOTH input and output.
+  -- Fix round 2 (2026-11-16): IS DISTINCT FROM, not <>. The payload
+  -- columns are nullable and jsonb_typeof(NULL) is NULL, so with <>
+  -- a NULL input made the predicate NULL (not true) and slipped
+  -- through; IS DISTINCT FROM 'object' is true for NULL, so a NULL
+  -- payload now fails this check too.
   if exists (
     select 1 from listing_links ll join books b on b.id = ll.listing_id
     join ai_runs r on r.id = ll.derivation_run_id
     where b.is_synthetic
-      and (jsonb_typeof(r.input) <> 'object'
-           or jsonb_typeof(r.output) <> 'object')
+      and (jsonb_typeof(r.input) is distinct from 'object'
+           or jsonb_typeof(r.output) is distinct from 'object')
   ) then
     raise exception 'assertions: a derivation ai_run payload is not a jsonb object (double-encoded?)';
   end if;

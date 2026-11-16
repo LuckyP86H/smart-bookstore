@@ -494,7 +494,13 @@ def main(argv: list[str] | None = None) -> int:
     results = run_load(rows, snapshot, args.database_url)
 
     expected = {
-        "ref_authors": manifest["total_authors"],
+        # Counted == inserted by construction (PR #67 fix round 2,
+        # same treatment as ref_author_aliases below): build_rows
+        # skips authors with no usable name — they never enter
+        # rows['authors'] and are never inserted — so the manifest's
+        # total_authors would over-count on any future slice that
+        # contains a nameless author and report a phantom MISMATCH.
+        "ref_authors": len(rows["authors"]),
         "ref_works": manifest["total_works"],
         "ref_editions": manifest["total_editions"],
         "isbn_index": len(rows["isbn_index"]),
