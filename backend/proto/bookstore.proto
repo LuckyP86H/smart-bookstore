@@ -65,6 +65,12 @@ message Book {
   // as real inventory. The Go backend predates the flag and leaves it
   // false — a documented divergence, like GetWork below.
   bool is_synthetic = 19;
+  // Route B P4 (additive): true when this listing is linked to a work
+  // (a listing_links row exists), so the grid renders its title as a
+  // link to the work page only when a work page actually exists;
+  // unlinked titles render as plain text. Populated by the Worker's
+  // list/detail queries; the Go backend leaves it false.
+  bool has_work = 20;
 }
 
 message Review {
@@ -245,8 +251,12 @@ message GetPurchaseHistoryResponse {
 
 message GetWorkRequest {
   // Identify the work by one of its listings (the frontend only ever
-  // holds listing ids) or by the projection work id directly. book_id
-  // wins when both are set.
+  // holds listing ids) or by the projection work id directly. work_id
+  // wins when both are set (fix round 2026-11-16: the proto previously
+  // said book_id wins, contradicting resolveProjection in
+  // worker/src/db/works.ts, which has always checked work_id first;
+  // the code's order is the one now stated in both places and pinned
+  // by a test).
   int64 book_id = 1;
   int64 work_id = 2;
 }
@@ -288,6 +298,11 @@ message WorkReview {
   int64 listing_id = 2;
   string store_name = 3;
   int64 edition_id = 4;
+  // True when the listing this review was written about is a synthetic
+  // fixture (books.is_synthetic via the listing): the work page badges
+  // demo reviews and labels its aggregates as including them, so demo
+  // reviews are never presented as real social proof (plan §4.4).
+  bool is_synthetic = 5;
 }
 
 message GetWorkResponse {
