@@ -1,5 +1,5 @@
 # FastAPI web framework
-fastapi==0.162.2
+fastapi==0.162.5
 uvicorn[standard]==0.54.0
 
 # LiteLLM for LLM provider abstraction
@@ -10,7 +10,7 @@ uvicorn[standard]==0.54.0
 litellm==1.109.1
 
 # Sentence transformers for embeddings
-sentence-transformers==6.2.0
+sentence-transformers==6.3.0
 
 # PostgreSQL adapter with pgvector support
 psycopg2-binary==2.9.13
