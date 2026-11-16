@@ -168,7 +168,7 @@ it. **Nothing here has touched the live database.**
   across stores, with synthetic listings badged as demo data. The
   divergence is also recorded in `DEPLOY.md`.
 
-## Gate results (local, fix-round run 2026-11-16 at `d753dbc`; originally run 2026-11-12, push-pass run 2026-11-15)
+## Gate results (local, fix-round run 2026-11-16 at `d753dbc` — local executed head; pushed equivalent `42aee8b`, tree-identical; originally run 2026-11-12, push-pass run 2026-11-15)
 
 > **Dated correction (2026-11-16, fix round item 4):** the previous
 > version of this section cited commit `efdec56` as the executed
@@ -177,6 +177,14 @@ it. **Nothing here has touched the live database.**
 > actually pushed for PR #67 was `d136ded4` (tree-identical to the
 > local `c1e6d45`). The record below cites the fix round's own
 > executed head, following the same dated-correction pattern.
+>
+> **Round-2 completion (2026-11-16, review 5926758268 item 1):**
+> the fix round's executed head `d753dbc` is likewise a local hash;
+> its pushed equivalent is `42aee8b` (tree-identical), now named
+> here, in `docs/PR3-BUILD-LOG.md`, and in the PR description, so
+> the gate run resolves to a pushed commit. The full local→pushed
+> hash mapping for every commit on this branch is tabulated in the
+> build log's round-2 section.
 
 `scripts/seed/run_gate.sh` against scratch PostgreSQL 16.15 +
 pgvector 0.8.0: **11 passed, 0 failed** — scaffolding + 9 migrations
@@ -192,6 +200,22 @@ checked), and the new real-DB F3 step proved the compensating
 alongside: vitest 197/197, typecheck clean, frontend
 production build green (zero `localhost` strings in the output),
 proto regeneration byte-identical.
+
+**Round-2 re-run (2026-11-16, review 5926758268):** the gate was
+re-run from scratch at local head `5353f2c` (pushed equivalent
+`82155f9`) after the round-2 seed fixes: **11 passed, 0 failed**,
+same counts everywhere (loader = manifest, re-run inserted 0,
+links 6/1/1, assertions 9/9, spot joins 12/12, verify_workpage and
+verify_f3_rollback PASS); vitest 197/197, typecheck clean, frontend
+build green, proto regeneration byte-identical. Round 2 also
+hardened assertions §3: the `ai_runs` jsonb-object check now uses
+`IS DISTINCT FROM 'object'`, so a NULL payload fails too —
+bite-proven by planting a NULL `input` on a derivation run inside
+a rolled-back transaction (the old `<>` predicate did not fire;
+the new check raises). GIF 05 was regenerated from a fresh real
+capture because the WorkPage review spacing changed (item 2);
+GIFs 01–04 are untouched. Full record: `docs/PR3-BUILD-LOG.md`,
+round-2 section.
 
 ## Staging smoke (2026-11-16, read-only — fix round item 13)
 

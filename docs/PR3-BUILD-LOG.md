@@ -203,6 +203,12 @@ scratch Postgres only.
   `jsonb_typeof(input) = 'object'` and `jsonb_typeof(output) =
   'object'`. No follow-up is outstanding. PR 3's gate asserts
   ai_runs on kind/status/non-null output only.
+  **Update (2026-11-16, fix rounds 1–2; review 5926758268 item 3):**
+  the last sentence is superseded. Fix round 1 (item 15) extended
+  assertions.sql §3 to assert both payloads are jsonb objects
+  (`jsonb_typeof = 'object'`), and fix round 2 hardened the same
+  check to `IS DISTINCT FROM 'object'` so a NULL payload fails it
+  too (bite-proven against the gate DB; see the round-2 section).
 
 ## Gate results (original run, 2026-11-12 — superseded; see Push pass 2026-11-15 for the final run)
 
@@ -535,7 +541,7 @@ prints the skip line for the demoted listing, processes only the
 no-ISBN listing, evidence counts unchanged (6 auto_linked/1 rejected).
 Logs: gate-logs-seed-fixround/.
 
-### FIX ROUND RESULTS (2026-11-16, all executed at head d753dbc unless noted)
+### FIX ROUND RESULTS (2026-11-16, all executed at head d753dbc — local hash; pushed equivalent `42aee8b`, tree-identical — unless noted)
 
 Local commits on c1e6d45 (coordinator pushes; pushed-head mapping is
 the coordinator's record):
@@ -549,8 +555,9 @@ the coordinator's record):
   titles, shared badge CSS (items 11/12/16 + badge nit)
 - d4de093 schema — F1 migration 20261111130500 (item 5)
 - 9bb5f60 seed — gate hardening (items 5-gate/6/7/8/14/15 + pins; amended from `0cf8b45` — amend mapping `0cf8b45` -> `9bb5f60`, see progress checkpoints)
-- d753dbc docs — plan annotations, DEPLOY update, seed README,
-  WorkPage GIF (scope question, items 10/13 records)
+- d753dbc docs (pushed as `42aee8b`) — plan annotations, DEPLOY
+  update, seed README, WorkPage GIF (scope question, items 10/13
+  records)
 - (final docs commit on top: this log's repo copy + README gate-head
   fill + regenerated GIFs 03/04 — docs-only, the c1e6d45 precedent)
 
@@ -569,6 +576,12 @@ Per-item disposition:
 4. FIXED — seed README gate section carries a dated correction:
    efdec56 was a local pre-push hash; the pushed head was d136ded4;
    the fix-round record cites the executed head d753dbc.
+   **Round-2 completion (2026-11-16, review 5926758268 item 1):**
+   d753dbc is itself a local hash; its pushed equivalent `42aee8b`
+   (tree-identical, verified by tree SHA) is now named in the seed
+   README, in this log, and in the PR description, and the full
+   local→pushed mapping for the branch is tabulated in the
+   round-2 section below.
 5. FIXED — migration 20261111130500 recreates the view WITH
    (security_invoker = true); gate assertions §9 proves catalog
    (reloptions) AND function (probe role refused through the invoker
@@ -687,8 +700,8 @@ PARKED (no behaviour change, reasoning):
   existing writeLink/writeDemotion structure, and the transactional
   stub tests still pass.
 
-Gates at d753dbc (numbers copied from run logs;
-gate-logs-seed-fixround/):
+Gates at d753dbc (pushed as `42aee8b`; numbers copied from run
+logs; gate-logs-seed-fixround/):
 - Seed gate: 11 passed, 0 failed (fresh DB; scaffolding + 9
   migrations; loader run 1 counts = manifest 5070/21597/4993/20000/
   13940/4993 with 29 rejected ISBNs; run 2 inserted=0 x6; generator;
@@ -725,3 +738,173 @@ FIX ROUND CLOSED 2026-11-16: item 1 completed by this round's
 final docs commit (docs/PR3-BUILD-LOG.md in-repo; this data-dir log
 and the repo copy are byte-identical). Branch NOT pushed —
 coordinator pushes after the independent claim audit.
+
+## FIX ROUND 2 (2026-11-16, review 5926758268 — 6 items)
+
+Lily verified 15 of the 16 round-1 items fixed and raised 6 small
+doc/cosmetic residuals ("Once these are in, I'll approve"). All 6
+are addressed here. Commits this round (local -> pushed,
+tree-identical; push via the PAT Git Data API as LuckyP86H,
+GET /user verified id 46582797, per-commit tree-SHA assertions all
+matched):
+
+- 7e8619c -> b44b9ee seed — assertions §3 NULL closure (item 5) +
+  load_slice ref_authors derivation (item 6)
+- 5353f2c -> 82155f9 frontend — WorkPage review spacing (item 2);
+  **the round-2 gate was executed at this head**
+- f22df64 -> 922843b seed — GIF 05 regenerated (item 2)
+- (final docs commit on top: this section, the README round-2
+  notes, and docs/PR3-CLAIM-AUDIT-2026-11-15.md — its pushed hash
+  is recorded in the round-2 summary comment on the PR, since a
+  commit cannot cite itself)
+
+Per-item disposition:
+
+1. FIXED — the gate record's executed head `d753dbc` did not
+   resolve in the pushed history (same defect class as the
+   `efdec56` it replaced). Facts re-verified this round, not taken
+   on trust: `42aee8b` exists in the pushed history
+   (42aee8bbb947be772cb8f9b027d8efac88ce7acc); its tree
+   5b5c834bf5882d2c9f0d9fed92978148307550ca equals the executed
+   local head d753dbc's tree exactly; `d136ded4`'s tree
+   (9e6301a6b77744739b2d640f9735625b193cc50f) equals local
+   c1e6d45's; and the two commits above `42aee8b` change only
+   docs, GIFs, and one shell comment (the run_gate.sh hunk in the
+   top commit is comment-only — verified in the diff). The record
+   stays honest: the gate WAS executed at the local head; all
+   three places (seed README gate section, this log's fix-round
+   header / commit list / item-4 disposition / gates line, and the
+   PR description's Verification section) now name `42aee8b` as
+   the pushed equivalent.
+2. FIXED — `.work-review-rating` now has a CSS rule
+   (font-weight 600, margin-right 0.5rem) in WorkPage.css; the
+   rating and review text no longer run together. GIF 05
+   regenerated from a fresh REAL Playwright/Chromium capture
+   (production frontend build with the fix + production Connect
+   router + seeded gate DB, fixture credential double; harness in
+   /tmp, scratch as in round 1). Frame 3 shows "★ 5 Seed fixture
+   review: exactly as described." with the rating spaced and
+   bold. New GIF: 412,361 B, 3 frames, 1000x791, durations
+   1700/1700/2600 (same geometry as round 1); GIFs 01-04
+   byte-identical, untouched. Capture notes: the first attempt at
+   a 1000px viewport rendered the stacked sub-`lg` layout and a
+   1280px attempt picked up the `xl` cart column; the final
+   capture used 1200x873 (downscaled to 1000x727), matching round
+   1's composition. Chromium's cover loads failed with
+   ERR_TUNNEL_CONNECTION_FAILED — the known sandbox-proxy
+   blanking, disclosed in the GIF footer and the seed README.
+3. FIXED — D3-18 now carries a dated update line (2026-11-16)
+   recording that its closing sentence ("gate asserts ai_runs on
+   kind/status/non-null output only") is superseded: §3 asserts
+   the payloads are jsonb objects (round 1, item 15), hardened to
+   IS DISTINCT FROM in this round (item 5).
+4. FIXED (commit route) — `PR3-CLAIM-AUDIT-2026-11-15.md` is now
+   committed at `docs/PR3-CLAIM-AUDIT-2026-11-15.md`, byte-identical
+   to the data-dir original (sha256
+   4646b958abc75313b0f8539c3a83d412431a035c7c65ecdf083118e7fa076446),
+   so both citations in this log ("in this directory" / "in this
+   dir") resolve truthfully. Contents checked before committing:
+   no secrets; the single machine-local path it contains (the
+   auditor's scratch-clone path, in its Materials section) is
+   self-describing provenance — where the audit ran — not a
+   repo-location claim, so the commit route stands over rewording.
+5. FIXED + BITE-PROVEN — assertions.sql §3 now uses
+   `jsonb_typeof(...) IS DISTINCT FROM 'object'` for both input
+   and output. Proof against the gate DB (log:
+   gate-logs-seed-fixround2/bite-proof-item5.log): inside one
+   transaction, a derivation ai_run's `input` was set to NULL;
+   the OLD `<>` predicate did NOT fire (the row slipped through,
+   reproducing the gap), the NEW predicate fired, and the full
+   assertions.sql then raised exactly the §3 exception
+   ("a derivation ai_run payload is not a jsonb object") at §3.
+   The transaction never committed; a follow-up read shows the
+   row's payloads are jsonb objects again — the gate DB was left
+   untouched, and the clean gate run (below) passed with the new
+   check in place.
+6. FIXED — load_slice.py `expected['ref_authors']` is now
+   `len(rows['authors'])` (counted == inserted by construction,
+   the alias-loop treatment from round 1 item 8): build_rows
+   skips nameless authors at insertion, so the manifest's
+   total_authors would over-count on any future slice containing
+   one. This slice unchanged: gate loader line reads
+   "ref_authors: before=0 inserted=5070 total=5070 expected=5070
+   OK".
+
+Citation sweep (standing proactive-review rule, same class as
+item 1): every SHA-like token in scripts/seed/README.md,
+docs/PR3-BUILD-LOG.md, scripts/schema/README.md, and the PR
+description was extracted (28 unique candidates) and tested
+against the pushed repo via GET /commits/<sha>. 4 unique commits
+resolve directly (2555ff8b, 27a4eddb, 42aee8b, d136ded4 — the
+last also cited in full form); 1 token (9e6301a6) is a TREE hash
+and resolves via GET /git/trees (it is d136ded4's tree, cited as
+a tree). The other 22 tokens are local pre-push hashes from the
+coordinator's clone; each is mapped below by tree SHA, so every
+citation in the record now resolves or is explained:
+
+  local     pushed    what it is
+  9fd4aae   65954b8   PR 3 proto commit (post-rebase)
+  666ad9c   cd4980c   PR 3 worker commit (post-rebase)
+  2932c9f   2550b81   PR 3 frontend commit (post-rebase)
+  7515153   d94f169   PR 3 seed commit (post-rebase)
+  dc0f0db   ba3c7b6   F3 option C
+  efdec56   3e9e84e   push-pass GIF regeneration
+  c1e6d45   d136ded4  push-pass head (PR as opened)
+  fd84c6c   7a1ff27   fix round 1: proto contracts
+  99212b6   a686df4   fix round 1: prefill throttle
+  0735030   cf762c1   fix round 1: worker items
+  cc8339b   277fbd4   fix round 1: frontend items
+  d4de093   48bad07   fix round 1: F1 migration
+  9bb5f60   0bc9f2d   fix round 1: gate hardening
+  d753dbc   42aee8b   fix round 1: docs (gate executed head)
+  0b4ea90   1d7aabf   fix round 1: build log committed
+  a9c0f88   a13646b9  fix round 1: claim-audit corrections (head
+                      Lily reviewed in round 2)
+  9e41ce2   53924b6e  PR 2 pre-review head — the original PR 3
+                      base (tree-paired; 53924b6e was PR #63's
+                      round-1 reviewed head)
+  0cf8b45   (none)    amended away before pushing; the log's
+                      inline amend mapping (0cf8b45 -> 9bb5f60)
+                      already says so, and 9bb5f60 -> 0bc9f2d
+                      above completes the chain
+  c883a64 / 7c6eb56 / b26c175 / 179902e
+            (none)    the four ORIGINAL pre-rebase build commits;
+                      never pushed in this form — the rebase
+                      replayed their changes as
+                      9fd4aae / 666ad9c / 2932c9f / 7515153
+                      (mapped above), exactly as the rebase
+                      record in this log already states
+
+All-digit lookalikes in the corpus are not commits (migration
+ids 20261111130400 / 20261111130500, the reviewer id 46582797,
+review id 5922392173, ISBN 9780134685991) and were excluded.
+
+Gates at 5353f2c (pushed as `82155f9`; numbers copied from run
+logs; gate-logs-seed-fixround2/):
+
+- Seed gate: 11 passed, 0 failed (fresh DB; scaffolding + 9
+  migrations; loader run 1 counts = manifest 5070/21597/4993/
+  20000/13940/4993 — ref_authors expected now derived from the
+  inserted row set, still 5070; run 2 inserted=0 x6; generator;
+  link_seed 6 linked / 1 demoted / 1 no_isbn; assertions.sql 9/9
+  PASS groups incl. the hardened §3; spot_joins B-mask 12/12 +
+  isbn_index 13,940 + rejected recomputed 29; verify_workpage
+  PASS; verify_f3_rollback PASS).
+- vitest: 197/197, 18 files (unchanged; no test added — the
+  item-6 derivation is exercised end-to-end by the loader's own
+  gate report, and a unit test would have to import the loader's
+  main() against a fabricated manifest, which does not fit the
+  existing test layout; noted rather than forced).
+- Typecheck: clean (exit 0). Frontend production build: green;
+  grep 'localhost' over frontend/dist = 0 hits. Proto:
+  `npm run build` ran the full generate step; git status clean
+  afterwards — generated files byte-identical.
+- Scratch env rebuilt again this round (VM restart had wiped
+  it): pgvector v0.8.0 built from source (make with_llvm=no),
+  cluster /tmp/pg2-scratch port 54329, `create extension vector`
+  -> 0.8.0, halfvec verified — the standing recipe.
+
+FIX ROUND 2 CLOSED 2026-11-16: all 6 items fixed and replied on
+the PR; branch pushed (docs commit on top of 922843b); this
+data-dir log and the repo copy are byte-identical. NOT merged —
+Lily re-reviews and approves.
