@@ -77,11 +77,5 @@
   color: var(--text-secondary, #666);
 }
 
-.synthetic-badge {
-  border: 1px solid #d97706;
-  color: #b45309;
-  border-radius: 4px;
-  padding: 0 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
+/* .synthetic-badge is defined once in synthetic-badge.css (shared
+   with BookCard; fix round 2026-11-16 dedupe) — not here. */

@@ -3,6 +3,7 @@ import { Code, ConnectError } from '@connectrpc/connect';
 import type { createCustomerClient } from '../api/client';
 import type { GetWorkResponse } from '../gen/bookstore_pb';
 import './WorkPage.css';
+import './synthetic-badge.css';
 
 // The minimal work page (P4 PR 3, plan §8): one canonical work, its
 // editions from the reference catalogue, and every store's offer of it,
@@ -84,7 +85,14 @@ function WorkPage({ client, bookId, onBack }: WorkPageProps) {
 
           <p className="work-aggregates">
             {work.reviewCount > 0
-              ? `${work.reviewCount} review${work.reviewCount === 1 ? '' : 's'} · average ${work.meanRating.toFixed(1)}`
+              ? `${work.reviewCount} review${work.reviewCount === 1 ? '' : 's'}${
+                  // §4.4: the aggregate must say what it includes —
+                  // demo reviews are never silently averaged in
+                  // (fix round item 12).
+                  work.reviews.some((entry) => entry.isSynthetic)
+                    ? ' (including demo reviews)'
+                    : ''
+                } · average ${work.meanRating.toFixed(1)}`
               : 'No reviews yet'}
             {work.offers.length > 0 &&
               ` · ${work.offers.length} offer${work.offers.length === 1 ? '' : 's'} from $${work.minPrice.toFixed(2)} to $${work.maxPrice.toFixed(2)}`}
@@ -140,18 +148,43 @@ function WorkPage({ client, bookId, onBack }: WorkPageProps) {
             <p className="work-empty">No reviews yet.</p>
           ) : (
             <ul className="work-reviews">
-              {work.reviews.map((entry) => (
-                <li key={entry.review?.id.toString()} className="work-review">
-                  <span className="work-review-rating">
-                    ★ {entry.review?.rating ?? 0}
-                  </span>
-                  <span className="work-review-text">{entry.review?.reviewText}</span>
-                  <span className="work-review-meta">
-                    — {entry.review?.customerName} · via {entry.storeName}
-                    {entry.editionId > 0n && <> · edition #{entry.editionId.toString()}</>}
-                  </span>
-                </li>
-              ))}
+              {work.reviews.map((entry) => {
+                // Edition attribution (fix round item 11): the
+                // editions list is already on this page — name the
+                // edition (title/publisher/year) instead of rendering
+                // a raw database id ('edition #123').
+                const edition = work.editions.find(
+                  (e) => e.editionId === entry.editionId,
+                );
+                return (
+                  <li key={entry.review?.id.toString()} className="work-review">
+                    <span className="work-review-rating">
+                      ★ {entry.review?.rating ?? 0}
+                    </span>
+                    <span className="work-review-text">{entry.review?.reviewText}</span>
+                    <span className="work-review-meta">
+                      — {entry.review?.customerName} · via {entry.storeName}
+                      {edition && (
+                        <>
+                          {' '}
+                          · edition “{edition.title}”
+                          {edition.publisher && <> ({edition.publisher}</>}
+                          {edition.publisher && edition.publishYear > 0 && (
+                            <>, {edition.publishYear}</>
+                          )}
+                          {edition.publisher && <>)</>}
+                          {!edition.publisher && edition.publishYear > 0 && (
+                            <> ({edition.publishYear})</>
+                          )}
+                        </>
+                      )}
+                    </span>
+                    {entry.isSynthetic && (
+                      <span className="synthetic-badge">Demo data</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>

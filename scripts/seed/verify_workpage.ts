@@ -94,6 +94,21 @@ async function main(): Promise<void> {
     check("review keeps its store attribution",
       reviews[0]?.storeName === "seed-merchant-a",
       String(reviews[0]?.storeName));
+    // Fix round items 11/12: the review's edition attribution must
+    // resolve to a real catalogue edition on the same page (the UI
+    // renders its title/publisher/year, not the raw id), and the
+    // review must carry the synthetic flag (its listing is a fixture).
+    const reviewEdition = (work.editions as { [key: string]: any }[]).find(
+      (e) => String(e.editionId) === String(reviews[0]?.editionId),
+    );
+    check("review edition attribution resolves to a catalogue edition",
+      reviewEdition !== undefined &&
+        typeof reviewEdition.title === "string" &&
+        reviewEdition.title !== "",
+      `editionId=${reviews[0]?.editionId}`);
+    check("review is flagged synthetic (demo review disclosure)",
+      reviews[0]?.isSynthetic === true,
+      String(reviews[0]?.isSynthetic));
     check("mean rating has the exact denominator",
       work.meanRating === 5 && reviews[0]?.review?.rating === 5,
       `mean=${work.meanRating}`);

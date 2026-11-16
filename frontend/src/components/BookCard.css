@@ -175,14 +175,6 @@
 }
 
 /* P4 §4.4 disclosure: synthetic listings are labelled, never passed
-   off as real inventory. */
-.synthetic-badge {
-  display: inline-block;
-  border: 1px solid #d97706;
-  color: #b45309;
-  border-radius: 4px;
-  padding: 0 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
-}
+   off as real inventory. The .synthetic-badge definition itself lives
+   in synthetic-badge.css — one shared definition for BookCard and
+   WorkPage (fix round 2026-11-16 dedupe). */

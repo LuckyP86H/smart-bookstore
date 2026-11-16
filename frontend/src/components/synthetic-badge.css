@@ -1,0 +1,14 @@
+/* P4 §4.4 disclosure badge — ONE shared definition (fix round
+   2026-11-16: BookCard.css and WorkPage.css previously each defined
+   .synthetic-badge and the two had already drifted). Imported by both
+   components; do not redefine it in component CSS. */
+.synthetic-badge {
+  display: inline-block;
+  border: 1px solid #d97706;
+  color: #b45309;
+  border-radius: 4px;
+  padding: 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}

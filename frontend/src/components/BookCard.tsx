@@ -1,5 +1,6 @@
 import { Book, Genre } from '../gen/bookstore_pb';
 import './BookCard.css';
+import './synthetic-badge.css';
 
 // Helper function to convert Genre enum value to display name
 const getGenreDisplayName = (genre: Genre): string => {
@@ -68,7 +69,10 @@ function BookCard({ book, onBuyNow, onAddToCart, cartQuantity = 0, onShowWork }:
       )}
       
       <div className="book-info">
-        {onShowWork ? (
+        {onShowWork && book.hasWork ? (
+          // Only linked listings have a work page (Book.has_work, fix
+          // round item 16): unlinked titles render as plain text, not
+          // as a button to GetWork's friendly 404.
           <h3 className="book-title">
             <button
               type="button"
