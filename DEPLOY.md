@@ -339,12 +339,15 @@ been rebased onto the merged PR 2 base, gained the F3 compensating
   procedure is now SIX migrations in filename order — see
   `scripts/seed/README.md`. The exposure it closes exists from the
   moment PR 2's migrations land, seeded or not.
-- **The real-Postgres check the P3 section above anticipated now
-  exists in this PR's gate:** `scripts/seed/run_gate.sh` runs
+- **New real-DB gate step (F3):** `scripts/seed/run_gate.sh` runs
   `verify_f3_rollback.ts` against the seeded scratch database — a
   forced `listing_links` failure inside the shipped linker leaves
   exactly one finished `error` ai_run and zero links (the unit suite
-  models the same behaviour against a stub).
+  models the same behaviour against a stub). This is a NEW check
+  proving the F3 rollback / compensating-run behaviour; it is NOT
+  the parity harness's real-Postgres concurrency check for
+  `PurchaseBook`/`CheckoutCart` writes anticipated in the P3 section
+  above (Owner follow-ups item 2), which remains OPEN.
 - **Prefill hardening:** the public `LookupBookByISBN` Open Library
   step now goes through the same throttled (≤3 req/s) + memoised
   (10-minute, negatives included) lookup policy as the Path A
@@ -354,8 +357,10 @@ been rebased onto the merged PR 2 base, gained the F3 compensating
   name their edition (title/publisher/year); `Book.has_work` lets the
   grid link only linked titles to work pages.
 - **Staging smoke (2026-11-16, read-only):** the deployed Worker
-  serves the app shell (GET / → 200), but its ENTIRE Connect RPC
-  surface — pre-existing P1–P3 RPCs included — currently returns
+  serves the app shell (GET / → 200), but every Connect RPC POST
+  tried — the four RPCs tried (`GetAvailableBooks`, `GetWork`,
+  `GetBookDetails`, `MerchantService/LookupBookByISBN`),
+  pre-existing P1–P3 RPCs among them — currently returns
   HTTP 500 "Failed to start container: no container application
   assigned to this Durable Object namespace". That is a staging
   provisioning state (owner/dashboard side), not a PR 3 code

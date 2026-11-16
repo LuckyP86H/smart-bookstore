@@ -12,7 +12,7 @@ What lives here:
 | `spot_joins.py` | Independent recomputation from PR 1's artifacts (B-mask spot joins, isbn_index total, synthetic ISBN resolution, rejected-ISBN count). |
 | `verify_workpage.ts` | Drives the production `GetWork` RPC against the seeded DB and checks the merged shape. |
 | `verify_f3_rollback.ts` | Proves F3 option C against the real DB: a forced link failure inside the shipped linker leaves exactly one finished `error` ai_run and zero links. |
-| `make_gifs.py` + `gifs/` | Terminal-replay GIFs rendered from the real gate logs (footer-labelled as replays, not live captures). |
+| `make_gifs.py` + `gifs/` | Terminal-replay GIFs 01–04 rendered from the real gate logs (footer-labelled as replays, not live captures). `05-workpage-demo.gif` is NOT produced by `make_gifs.py` — it is a real Playwright capture (see below). |
 
 Gate replays (rendered from the real run logs — not live captures):
 
@@ -201,14 +201,15 @@ Executed against the deployed staging Worker
 read-only RPC POSTs only, no remote writes:
 
 - `GET /` → **200** — the app shell loads.
-- **Every Connect RPC POST returns HTTP 500** with the plain-text
+- **Every Connect RPC POST tried returns HTTP 500** (the four
+  RPCs tried: `GetAvailableBooks`, `GetWork`, `GetBookDetails`,
+  `MerchantService/LookupBookByISBN`) with the plain-text
   body "Failed to start container: There is no container application
-  assigned to this Durable Object namespace" — verified on
-  `GetAvailableBooks`, `GetBookDetails`, `GetWork`, and the public
-  `LookupBookByISBN`. Those include pre-existing P1–P3 RPCs, so this
-  is a staging provisioning state (the container Durable Object
-  namespace has no container application assigned — an owner /
-  dashboard matter), **not a PR 3 code regression**.
+  assigned to this Durable Object namespace". Those tried include
+  pre-existing P1–P3 RPCs, so this is a staging provisioning
+  state (the container Durable Object namespace has no container
+  application assigned — an owner / dashboard matter),
+  **not a PR 3 code regression**.
 
 The RPC-level smoke the plan asks for (GetWork not-found path,
 LookupBookByISBN public path) therefore **cannot be completed

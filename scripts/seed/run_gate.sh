@@ -24,8 +24,12 @@
 #                            a forced link failure inside the shipped
 #                            linker leaves exactly one finished
 #                            'error' ai_run and zero listing_links —
-#                            the real-Postgres step DEPLOY.md's P3
-#                            section anticipated; fix round item 14)
+#                            a NEW real-DB gate step proving the F3
+#                            rollback / compensating-run behaviour;
+#                            fix round item 14. This is NOT the P3
+#                            parity harness's real-Postgres
+#                            concurrency check for PurchaseBook /
+#                            CheckoutCart writes, which remains open)
 #
 # The vitest suite, typecheck, and the frontend production build are
 # repo-level gates, run separately (npm test / npm run typecheck /

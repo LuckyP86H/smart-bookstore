@@ -479,26 +479,26 @@ Environment truth at round start (checked, not assumed):
   clones) — item 10 recording attempt is feasible in principle.
 
 Checklist (tick as done; gate numbers copied from run logs only):
-- [ ] Item 1: docs/PR3-BUILD-LOG.md committed (this log, repo copy)
-- [ ] Item 2: prefill routed through throttled+memoised OL lookup + test
-- [ ] Item 3: GetWork workId-wins in proto + code + test
-- [ ] Item 4: seed README gate record -> real head, dated correction
-- [ ] Item 5: F1 as migration 20261111130500 + gate assertions/probe; README six migrations + exposure framing
-- [ ] Item 6: seed accounts README correction + --staging guard in generate_synthetic.py
-- [ ] Item 7: link_seed.ts idempotency guard + README re-run behaviour
-- [ ] Item 8: load_slice.py OL alias guard (mirror Wikidata)
-- [ ] Item 9: isbn13.ts header correction + full-width rejection test
-- [ ] Item 10: WorkPage recording (real / replay-labelled / deferred+blocker)
-- [ ] Item 11: WorkPage edition attribution (title/publisher/year) + verify_workpage pin
-- [ ] Item 12: WorkReview.is_synthetic proto + GetWork + WorkPage badge + aggregate wording
-- [ ] Item 13: staging smoke (read-only) recorded in seed README, or explicit deferral
-- [ ] Item 14: gate real-Postgres F3 concurrency/rollback step
-- [ ] Item 15: assertions.sql §3 jsonb_typeof object checks
-- [ ] Item 16: Book linked flag through list query (proto + RPC + frontend)
-- [ ] Scope question: D3-16 reading recorded as dated annotation at plan §4.6/§9 in BOTH plan copies; §15 PR 3 branch name fixed in both
-- [ ] Nits: F3-C comment 'in the normal case'; works.ts no-projection comment; generate_synthetic donor check + e3 loud warning + --reset docstring; pin aliases 21,597 / B-mask 12 / rejected 29; .gitignore seed bundles; .synthetic-badge dedupe; load_slice docstring path placeholder; DEPLOY.md P3 update; README typo 'an interrupted run'
-- [ ] Parked (reasoning recorded, no behaviour change): agreement.ts NFKC; merchant.ts AddBook synchronous Path A latency; identity.ts ambiguous-path partial evidence — EVALUATE transactional wrap
-- [ ] Gates at final head: seed gate (rebuilt scratch PG, amended migrations), vitest, typecheck, frontend build (0 localhost), proto regen byte-identical; gate GIFs regenerated if displayed output changed; logs in gate-logs-seed-fixround/
+- [x] Item 1: docs/PR3-BUILD-LOG.md committed (this log, repo copy)
+- [x] Item 2: prefill routed through throttled+memoised OL lookup + test
+- [x] Item 3: GetWork workId-wins in proto + code + test
+- [x] Item 4: seed README gate record -> real head, dated correction
+- [x] Item 5: F1 as migration 20261111130500 + gate assertions/probe; README six migrations + exposure framing
+- [x] Item 6: seed accounts README correction + --staging guard in generate_synthetic.py
+- [x] Item 7: link_seed.ts idempotency guard + README re-run behaviour
+- [x] Item 8: load_slice.py OL alias guard (mirror Wikidata)
+- [x] Item 9: isbn13.ts header correction + full-width rejection test
+- [x] Item 10: WorkPage recording (real / replay-labelled / deferred+blocker)
+- [x] Item 11: WorkPage edition attribution (title/publisher/year) + verify_workpage pin
+- [x] Item 12: WorkReview.is_synthetic proto + GetWork + WorkPage badge + aggregate wording
+- [x] Item 13: staging smoke (read-only) recorded in seed README, or explicit deferral
+- [x] Item 14: gate real-Postgres F3 rollback step
+- [x] Item 15: assertions.sql §3 jsonb_typeof object checks
+- [x] Item 16: Book linked flag through list query (proto + RPC + frontend)
+- [x] Scope question: D3-16 reading recorded as dated annotation at plan §4.6/§9 in BOTH plan copies; §15 PR 3 branch name fixed in both
+- [x] Nits: F3-C comment 'in the normal case'; works.ts no-projection comment; generate_synthetic donor check + e3 loud warning + --reset docstring; pin aliases 21,597 / B-mask 12 / rejected 29; .gitignore seed bundles; .synthetic-badge dedupe; load_slice docstring path placeholder; DEPLOY.md P3 update; README typo 'an interrupted run'
+- [x] Parked (reasoning recorded, no behaviour change): agreement.ts NFKC; merchant.ts AddBook synchronous Path A latency; identity.ts ambiguous-path partial evidence — EVALUATE transactional wrap
+- [x] Gates at final head: seed gate (rebuilt scratch PG, amended migrations), vitest, typecheck, frontend build (0 localhost), proto regen byte-identical; gate GIFs regenerated if displayed output changed; logs in gate-logs-seed-fixround/
 
 ### Progress checkpoint 1 (2026-11-16, builder)
 Scratch env REBUILT and verified: apt PostgreSQL 16.15, pgvector
@@ -513,13 +513,13 @@ Committed so far (local, on c1e6d45):
   fits the existing writeLink/writeDemotion structure)
 - cc8339b frontend (items 11/12/16 UI + badge dedupe)
 - d4de093 schema F1 migration 20261111130500 (item 5)
-- 0cf8b45 seed gate hardening (items 5-gate/6/7/8/14/15 + pinned numbers)
+- 0cf8b45 seed gate hardening (items 5-gate/6/7/8/14/15 + pinned numbers) [amend mapping: `0cf8b45` -> `9bb5f60` — `0cf8b45` was amended away (§9 fixture fix) and does not exist in the final history; the amended commit is `9bb5f60` (dated correction, 2026-11-16 claim-audit fix)]
 F1 probe design PROVEN on the scratch cluster before writing §9:
 probe role + SET ROLE inside a DO block — invoker view refuses,
 owner-semantics control view returns the planted row.
 
 ### Progress checkpoint 2 (2026-11-16, builder)
-Seed gate at the fix-round head (0cf8b45 + §9 fixture fix, amended):
+Seed gate at the fix-round head (0cf8b45 + §9 fixture fix, amended) [amend mapping: `0cf8b45` -> `9bb5f60` — the amended commit in the final history is `9bb5f60` (dated correction, 2026-11-16 claim-audit fix)]:
 **11 passed, 0 failed** — scaffolding + 9 migrations; loader x2
 (inserted=0 x6); generator (--staging); link_seed 6/1/1;
 assertions.sql 9/9 groups (new: §1 aliases 21,597 pin, §3
@@ -548,7 +548,7 @@ the coordinator's record):
 - cc8339b frontend — edition attribution, demo badges, linked-only
   titles, shared badge CSS (items 11/12/16 + badge nit)
 - d4de093 schema — F1 migration 20261111130500 (item 5)
-- 9bb5f60 seed — gate hardening (items 5-gate/6/7/8/14/15 + pins)
+- 9bb5f60 seed — gate hardening (items 5-gate/6/7/8/14/15 + pins; amended from `0cf8b45` — amend mapping `0cf8b45` -> `9bb5f60`, see progress checkpoints)
 - d753dbc docs — plan annotations, DEPLOY update, seed README,
   WorkPage GIF (scope question, items 10/13 records)
 - (final docs commit on top: this log's repo copy + README gate-head
@@ -616,8 +616,9 @@ Per-item disposition:
     review is synthetic; verify_workpage pins the flag.
 13. EXECUTED, SURFACE BLOCKED (recorded, not deferred silently) —
     staging smoke 2026-11-16, read-only: GET / -> 200 (app shell
-    loads); EVERY Connect RPC POST (GetAvailableBooks, GetBookDetails,
-    GetWork, public LookupBookByISBN) -> HTTP 500 "Failed to start
+    loads); every Connect RPC POST tried — the four RPCs tried
+    (GetAvailableBooks, GetWork, GetBookDetails,
+    MerchantService/LookupBookByISBN) -> HTTP 500 "Failed to start
     container: There is no container application assigned to this
     Durable Object namespace". Pre-existing P1-P3 RPCs fail
     identically, so this is the staging deployment's container
@@ -638,8 +639,9 @@ Per-item disposition:
     shipped linker against real Postgres -> call rejects with the
     forced error, 0 listing_links, exactly 1 ai_runs row (status
     error, finished_at stamped, jsonb_typeof input/output = object,
-    output.compensated = true). DEPLOY.md's anticipated check now
-    points at it.
+    output.compensated = true). DEPLOY.md records it as a NEW
+    real-DB gate step; the P3 parity harness's real-Postgres
+    concurrency check remains open (not satisfied by this step).
 15. FIXED — assertions.sql §3 asserts jsonb_typeof(input)='object'
     AND jsonb_typeof(output)='object' for derivation runs.
 16. FIXED — Book.has_work (proto field 20) from an EXISTS
@@ -716,8 +718,8 @@ gate-logs-seed-fixround/):
   gate re-ran clean — recorded here so the failed attempt is not
   mistaken for a code failure.
 
-Checklist: all items ticked except item 1, which the final docs
-commit carrying this log's repo copy completes.
+Checklist: all items ticked, including item 1 — completed by
+the final docs commit carrying this log's repo copy (`0b4ea90`).
 
 FIX ROUND CLOSED 2026-11-16: item 1 completed by this round's
 final docs commit (docs/PR3-BUILD-LOG.md in-repo; this data-dir log
