@@ -125,6 +125,11 @@ async function resolveProjection(
   run: QueryRunner,
   selector: WorkSelector,
 ): Promise<ProjectionRow | null> {
+  // Precedence (fix round 2026-11-16, item 3): work_id WINS when both
+  // are set — stated identically in backend/proto/bookstore.proto's
+  // GetWorkRequest comment and pinned by a works.test.ts case. (The
+  // proto previously claimed book_id wins; the code has always checked
+  // workId first, and the frontend only ever passes one.)
   if (selector.workId !== undefined && selector.workId !== 0n) {
     const rows = await run(
       `SELECT ${PROJECTION_COLUMNS} FROM works wk WHERE wk.id = $1`,
@@ -158,6 +163,13 @@ export async function getWork(
 ): Promise<GetWorkResponse | null> {
   const projection = await resolveProjection(run, selector);
   if (projection === null) {
+    // Known gap (noted in PR #67 review, non-blocking): a listing can
+    // be linked (listing_links row exists) while its work has NO
+    // projection row in `works` — resolveProjection then finds nothing
+    // and GetWork 404s, even though a link exists. The projection is
+    // seeded for every reference work (D3-5), so this needs a work
+    // linked outside the seeded catalogue; building the projection on
+    // demand is later work, not a silent fix here.
     return null;
   }
   const { workRefId, localWorkId } = projection;
@@ -240,6 +252,7 @@ export async function getWork(
             cs.username AS customer_name, r.rating AS rating,
             r.review_text AS review_text, r.created_at AS created_at,
             b.id AS listing_id, s.username AS store_name,
+            b.is_synthetic AS is_synthetic,
             ll.edition_ref_id AS edition_ref_id
      FROM reviews r
      JOIN books b ON b.id = r.book_id
@@ -256,6 +269,10 @@ export async function getWork(
       listingId: toBigInt(row["listing_id"]),
       storeName: toTextOrNull(row["store_name"]) ?? "",
       editionId: toBigInt(row["edition_ref_id"]),
+      // §4.4 disclosure at review granularity: a review of a synthetic
+      // listing is demo data, and the page badges it + labels the
+      // aggregate as including demo reviews (fix round item 12).
+      isSynthetic: row["is_synthetic"] === true,
     }),
   );
 

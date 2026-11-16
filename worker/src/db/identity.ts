@@ -317,8 +317,14 @@ async function writeLink(
 /**
  * F3 option C's compensating record: ONE ai_runs row for a rolled-back
  * link attempt, written start+finish on the non-transactional handle
- * so it is born in its terminal 'error' state — this path can never
- * leave an orphaned 'running' row. It carries the attempt's inputs
+ * so it is born in its terminal 'error' state — in the normal case
+ * this path can never leave an orphaned 'running' row. (Qualified in
+ * the PR #67 fix round: the compensating write swallows ALL its own
+ * errors by design, so if finishRun itself were to throw after
+ * startRun succeeded, that one row would stay 'running' — the swallow
+ * is correct, because the ledger must never mask the real link
+ * failure, but the guarantee is a normal-case one, not absolute.) It
+ * carries the attempt's inputs
  * (the same payload the in-transaction startRun used) and the caught
  * error; it cannot carry the rolled-back run's id, which never
  * committed — the inputs are the linkage. A failure of the
@@ -487,9 +493,18 @@ export async function linkListingPathA(
   if (passing.length > 1) {
     // Genuine ambiguity between editions of (usually) the same work:
     // precision first — propose all, link none (Step 6's review band).
-    for (const { candidate, bands } of passing) {
-      await insertEvidence(deps.run, listing.id, candidate, bands, "proposed");
-    }
+    // The proposed evidence rows are written in ONE transaction on the
+    // tx handle (fix round 2026-11-16, evaluating the review's nit):
+    // previously each insert ran on the non-transactional handle, so a
+    // mid-loop failure left a partial evidence set. The wrap is small
+    // and fits the existing handle structure (writeLink/writeDemotion
+    // already transact their multi-row writes the same way), so it is
+    // done here rather than parked.
+    await deps.begin(async (tx) => {
+      for (const { candidate, bands } of passing) {
+        await insertEvidence(tx, listing.id, candidate, bands, "proposed");
+      }
+    });
     return { status: "ambiguous", isbn13, candidateCount: passing.length };
   }
 

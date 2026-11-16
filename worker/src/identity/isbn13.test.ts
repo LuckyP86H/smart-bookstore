@@ -29,6 +29,14 @@ describe("canonicalISBN13", () => {
     expect(canonicalISBN13("0804429571")).toBeNull(); // X replaced by 1
   });
 
+  it("rejects full-width ISBN input (pinned divergence from the loader, #72 R1)", () => {
+    // Full-width digits: the seed loader's canonicalise accepts these
+    // (they canonicalise to themselves), the Worker rejects them —
+    // safe direction (no link attempt), root fix is NFKC in #72 R1.
+    expect(canonicalISBN13("９７８０１３４６８５９９１")).toBeNull();
+    expect(canonicalISBN13("０１３４６８５９９７")).toBeNull();
+  });
+
   it("returns null for garbage and empties", () => {
     expect(canonicalISBN13("not-an-isbn")).toBeNull();
     expect(canonicalISBN13("123")).toBeNull();

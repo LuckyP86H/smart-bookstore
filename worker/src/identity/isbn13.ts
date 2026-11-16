@@ -7,7 +7,18 @@
 // here: strip hyphens/spaces, uppercase, validate the check digit, and
 // convert ISBN-10 as 978 + first nine digits + recomputed ISBN-13 check
 // digit — the same rules as PR 1's isbn_map builder, so the Worker's
-// derivation and the seeded isbn_index agree by construction.
+// derivation and the seeded isbn_index agree for every input both
+// sides accept in the same way. ONE known divergence (verified on both
+// sides in PR #67 review, item 9): FULL-WIDTH input (e.g. '９７８…').
+// The loader's canonicalise accepts a full-width ISBN-13 (it
+// canonicalises to itself, producing index rows no listing can ever
+// join to), while this Worker's canonicalISBN13 REJECTS it (null —
+// normalizeISBN admits only ASCII digits/X). The divergence is
+// safe-direction: full-width ISBN listings simply never link, and the
+// loader's full-width index rows are dead weight, not wrong links.
+// The root fix (NFKC in the loader's clean_isbn) is #72 R1, not this
+// file; a test in isbn13.test.ts pins the Worker's rejection so the
+// behaviour is explicit rather than accidental.
 //
 // An ISBN that cannot be canonicalised (bad length, bad characters,
 // bad checksum) yields null: no link attempt is made, and that is NOT

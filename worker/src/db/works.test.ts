@@ -78,6 +78,7 @@ const REVIEWS = [
     created_at: new Date("2026-11-01T00:00:00Z"),
     listing_id: 55n,
     store_name: "merchant1",
+    is_synthetic: false,
     edition_ref_id: 11n,
   },
   {
@@ -90,6 +91,7 @@ const REVIEWS = [
     created_at: new Date("2026-11-02T00:00:00Z"),
     listing_id: 56n,
     store_name: "seed-merchant-b",
+    is_synthetic: true,
     edition_ref_id: 11n,
   },
 ];
@@ -102,14 +104,14 @@ function fixtureRun(overrides: Partial<Record<string, QueryRow[]>> = {}) {
     if (text.includes("FROM works wk WHERE")) {
       return overrides["projection"] ?? [PROJECTION];
     }
+    if (text.includes("FROM reviews r")) {
+      return overrides["reviews"] ?? REVIEWS;
+    }
     if (text.includes("b.is_synthetic")) {
       return overrides["offers"] ?? OFFERS;
     }
     if (text.includes("FROM ref_editions")) {
       return overrides["editions"] ?? EDITIONS;
-    }
-    if (text.includes("FROM reviews r")) {
-      return overrides["reviews"] ?? REVIEWS;
     }
     return [];
   };
@@ -140,6 +142,10 @@ describe("getWork", () => {
     expect(work.reviews[0].storeName).toBe("merchant1");
     expect(work.reviews[0].review?.rating).toBe(5);
     expect(work.reviews[1].listingId).toBe(56n);
+    // §4.4 at review granularity: the synthetic listing's review is
+    // flagged, the real one is not (fix round item 12).
+    expect(work.reviews[0].isSynthetic).toBe(false);
+    expect(work.reviews[1].isSynthetic).toBe(true);
 
     // Aggregates with exact denominators.
     expect(work.reviewCount).toBe(2);
@@ -154,6 +160,24 @@ describe("getWork", () => {
   it("resolves by projection work id as well as by listing id", async () => {
     const work = await getWork(fixtureRun(), { workId: 7n });
     expect(work?.title).toBe("Effective Java");
+  });
+
+  it("work_id wins when both selectors are set (fix round item 3)", async () => {
+    // The proto comment and resolveProjection agree: workId is checked
+    // first. The two selectors name DIFFERENT projections here, so the
+    // winner is observable.
+    const run: QueryRunner = async (text) => {
+      if (text.includes("FROM works wk WHERE")) {
+        return [{ ...PROJECTION, id: 7n, title: "Resolved By Work Id" }];
+      }
+      if (text.includes("IS NOT DISTINCT FROM ll.work_ref_id")) {
+        return [{ ...PROJECTION, id: 8n, title: "Resolved By Book Id" }];
+      }
+      return [];
+    };
+    const work = await getWork(run, { bookId: 55n, workId: 7n });
+    expect(work?.title).toBe("Resolved By Work Id");
+    expect(work?.workId).toBe(7n);
   });
 
   it("returns null for an unlinked listing / unknown work", async () => {
