@@ -428,6 +428,20 @@ but does not submit them: `AddBook` cannot know where a field came from and must
 This is a behaviour change to a shipped surface — it is therefore an explicit
 owner decision (§12), not a silent fix.
 
+**Annotation (2026-11-16, PR #67 fix round — the D3-16 reading, confirmed on review):**
+the RPC-layer marking IS the intended P3 reading of this section. This branch's SPA has
+no add-book form component (the frontend ships a customer grid plus an unused public
+merchant client), so there is no form in which the fix could literally live; what §4.6
+requires — the prefill stops treating Google as the source, and Google content is never
+persisted — is enforced where the data flows: `LookupBookByISBN` orders local index →
+Open Library → Google and marks Google's description/cover with the additive proto
+fields `description_transient` / `cover_transient` (+ `source` / `attribution`), which
+is the contract any future form must honour. `AddBook` stays at P3 parity precisely
+because it cannot know a field's provenance — the plan's own reasoning above. The §9
+Step 4 criterion ("a listing added with a Google-only ISBN shows attribution and stores
+no Google content") is therefore observable at the RPC layer, and should be read that
+way; it does not assert a form behaviour nobody can observe.
+
 ---
 
 ## 5. Orchestration — Postgres is the backlog; the Queue is a trigger; the sweep reconciles
@@ -646,6 +660,12 @@ propose-only fallback caps it).
 | **9. Jev photo flows** (M) | B-photo gold set built and scoring rules registered (§7.1) **before** any Jev call is scored; Jev pinned ≥1.14; flows (a) copyright-page → edition, (b) self-questioning shortlist, (c) EN/ZH photo rows; candidate caps + batching per §7.3 (candidate counts measured in week 1); Workers AI vision fallback benchmarked on the identical set; photo pipeline per §7.5. | Per-flow keep/replace decision taken by the pre-registered rule (§7.4) on first-attempt scores; every Jev call in `ai_runs` with token counts (total Act 1 Jev spend reported in §9 Step 10's closeout); fallback path demonstrably ships a listing end-to-end with Jev disabled. |
 | **10. Residue, refresh, closeout** (S–M) | Path C grouping under constraint checks (§3.2 rule 5); snapshot refresh drill (newer OL dump → re-derive all links); DEPLOY.md Act 1 section (migration order, owner steps, measured numbers: queue ops, neurons and Jev spend from `ai_runs`, final benchmark table); README interim note (full dynamic-UML + GIF treatment lands at P5 per the docs standard). | Refresh drill: **zero assertions lost**, every link re-derived, diff report reviewed; docs-vs-code pass: every command in the new DEPLOY.md section executed or marked owner-dashboard. |
 
+**Annotation (2026-11-16, PR #67 fix round) on Step 4's §4.6 criterion:** "a listing added
+with a Google-only ISBN shows attribution and stores no Google content" is read at the
+RPC layer, per the dated annotation at §4.6 (decision D3-16, confirmed on review): the
+SPA has no add-book form, so the transient-marking contract on `LookupBookByISBN` is the
+observable form of the criterion for P3/PR 3.
+
 Cut order if time runs short (v2 §9.2's discipline): Step 9's flow (b), then (c) as a *shipped*
 flow (its test row still runs), then Step 10's Path C automation (residue rests as singletons).
 **Never cut Step 1** — every later choice needs its numbers.
@@ -807,7 +827,7 @@ out per-PR below.
 |---|---|---|---|
 | **PR 1** `feat/p4-pr1-catalogue-benchmarks` | 1 | Offline catalogue build (OL dumps → DuckDB/Parquet slice + manifest); benchmark builders (B-mask, B-open, B-pairs, B-enzh); ISBN-only and naive-trigram baseline scorers. Scripts and research outputs only — no Worker code, no migrations. | Slice builds reproducibly; baselines measured and recorded. **Pause point: the data verdict — everything after this is sized by real numbers.** |
 | **PR 2** `feat/p4-pr2-schema-platform` | 2 | Migration series (reference tables + `isbn_index`, facets, evidence, assertions, `identity_events`, `listing_links`, tasks, works projection, `books.categories`); embedding provenance + `vector(1024)`; `ai_runs` upgrade; `prompts` registry; `review_aspects` table/view; `is_synthetic` flags; Worker `ai/` skeleton + `AI` binding. Container declarations stay (decision 12). | Migrations rehearse clean against a copy of the live DB; P3 suite still 123/123; the 1024-dim assertion fails loud where the 384-dim one stood. |
-| **PR 3** `feat/p4-pr3-path-a-workpage` | 3–4 | Seed loader + synthetic flags/UI disclosure (load itself is owner-run, §10); Path A live: canonical ISBN-13 join on write, lying-ISBN guard, identified OL API fallback, Google prefill demoted in the form; minimal work page. | Staging smoke on the throwaway Worker; **pause point: the first surface the owner can actually look at.** |
+| **PR 3** `feat/p4-pr3-seed-patha` | 3–4 | Seed loader + synthetic flags/UI disclosure (load itself is owner-run, §10); Path A live: canonical ISBN-13 join on write, lying-ISBN guard, identified OL API fallback, Google prefill demoted in the form; minimal work page. | Staging smoke on the throwaway Worker; **pause point: the first surface the owner can actually look at.** |
 | **PR 4** `feat/p4-pr4-path-b-offline` | 5 | Facet parser; one SQL comparison implementation used for both fitting and serving; EM weight fitting; both veto sets; thresholds set from measured precision (max two fitting rounds). Offline only — no online behaviour changes. | Fitted report lands; auto-link precision on the large suites meets the §3.4 gates; the review band's expected share is a measured number, not a guess (feeds decision 6's 10% tripwire). |
 | **PR 5** `feat/p4-pr5-path-b-online-review` | 6 | Task table + claim loop, cron sweep, assisted entry, evidence-showing review screen, assertions write path, re-derivation. | End-to-end on staging fixtures; **pause point: the identity engine is live, with the owner working the band.** |
 | **PR 6** `feat/p4-pr6-work-pages` | 7 | `GetWork` complete over derived membership; two-axis trust; merged verified reviews with exact denominators; gated reversibility demo; born-identified shelf/bundle pages. | Work pages serve merged data with honest denominators; a merge can be reversed in the demo without touching an assertion. |
