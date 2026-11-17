@@ -153,6 +153,37 @@ describe("row mapping", () => {
     expect(book.storeName).toBe("merchant1");
   });
 
+  it("maps the has_work link flag from the list query (fix round item 16)", () => {
+    const base = {
+      id: "7",
+      store_id: 1,
+      isbn: "9780441172719",
+      title: "Dune",
+      author: "Frank Herbert",
+      genre: "FICTION",
+      publisher: "Ace",
+      publication_year: 1990,
+      page_count: 688,
+      language: "en",
+      cover_image_url: "",
+      description: "",
+      price: "19.99",
+      stock_quantity: 4,
+      total_sold: 12,
+      average_rating: "4.50",
+      created_at: new Date("2026-11-01T09:30:49.000Z"),
+      store_name: "merchant1",
+    };
+    expect(bookFromRow({ ...base, has_work: true }).hasWork).toBe(true);
+    expect(bookFromRow({ ...base, has_work: false }).hasWork).toBe(false);
+    // Write-path rows (BOOK_RETURNING) carry no has_work column at all.
+    expect(bookFromRow(base).hasWork).toBe(false);
+    // The list query itself carries the EXISTS flag.
+    const { pageText } = buildAvailableBooksQueries(BASE_FILTER);
+    expect(pageText).toContain("AS has_work");
+    expect(pageText).toContain("FROM listing_links ll");
+  });
+
   it("maps unknown stored genre strings to GENRE_UNSPECIFIED", () => {
     expect(genreFromName("GENRE_PSYCHOLOGY")).toBe(Genre.GENRE_UNSPECIFIED);
     expect(genreFromName(null)).toBe(Genre.GENRE_UNSPECIFIED);

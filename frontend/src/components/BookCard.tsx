@@ -1,5 +1,6 @@
 import { Book, Genre } from '../gen/bookstore_pb';
 import './BookCard.css';
+import './synthetic-badge.css';
 
 // Helper function to convert Genre enum value to display name
 const getGenreDisplayName = (genre: Genre): string => {
@@ -29,9 +30,11 @@ interface BookCardProps {
   onBuyNow: (book: Book) => void;
   onAddToCart: (book: Book) => void;
   cartQuantity?: number; // Current quantity in cart for this book
+  /** Opens the listing's work page (P4 §8), when the host wires it. */
+  onShowWork?: (book: Book) => void;
 }
 
-function BookCard({ book, onBuyNow, onAddToCart, cartQuantity = 0 }: BookCardProps) {
+function BookCard({ book, onBuyNow, onAddToCart, cartQuantity = 0, onShowWork }: BookCardProps) {
   const isOutOfStock = book.stockQuantity === 0;
   const isLowStock = book.stockQuantity > 0 && book.stockQuantity <= 3;
   const remainingStock = book.stockQuantity - cartQuantity;
@@ -66,8 +69,25 @@ function BookCard({ book, onBuyNow, onAddToCart, cartQuantity = 0 }: BookCardPro
       )}
       
       <div className="book-info">
-        <h3 className="book-title">{book.title}</h3>
+        {onShowWork && book.hasWork ? (
+          // Only linked listings have a work page (Book.has_work, fix
+          // round item 16): unlinked titles render as plain text, not
+          // as a button to GetWork's friendly 404.
+          <h3 className="book-title">
+            <button
+              type="button"
+              className="book-title-button"
+              onClick={() => onShowWork(book)}
+              title="See all listings of this work"
+            >
+              {book.title}
+            </button>
+          </h3>
+        ) : (
+          <h3 className="book-title">{book.title}</h3>
+        )}
         <p className="book-author">by {book.author}</p>
+        {book.isSynthetic && <span className="synthetic-badge">Demo data</span>}
         <p className="book-genre">{getGenreDisplayName(book.genre)}</p>
         
         {book.averageRating > 0 && (

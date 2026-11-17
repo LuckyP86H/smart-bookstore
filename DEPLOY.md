@@ -302,3 +302,67 @@ in this serving context") instead of running non-atomically.
    that is the run that exercises `writes-mutating/` against both
    implementations, including the P3 gate's real-Postgres concurrency
    check (the unit suite models it; only a real database proves it).
+
+## Route B P4 PR 3 — seed load, Path A, GetWork (2026-11-12)
+
+> Status: implemented on `feat/p4-pr3-seed-patha`. The reference
+> catalogue seed, Path A identity linking, the §4.6 prefill order, and
+> the first work page. The seed procedure itself (owner-run against
+> Supabase) lives in `scripts/seed/README.md`.
+
+- **Documented divergence — GetWork is Worker-only.** Plan §12
+  decision 8 froze Go parity at the P3 surface. `CustomerService/
+  GetWork` (plan §8) is implemented only by the Worker; the Go backend
+  does not serve it and its generated stub must never be called. The
+  same applies to the additive `Book.is_synthetic` field: the Worker
+  populates it from `books.is_synthetic`; Go leaves the zero value.
+  Both divergences are additive and wire-compatible — nothing at P3
+  parity changes.
+- **Path A runs inside AddBook** when the serving path wires it
+  (production does): after the P3-parity upsert, the listing is linked
+  by canonical ISBN-13 through `isbn_index`, subject to the lying-ISBN
+  agreement guard; failures are logged, never surfaced — the merchant's
+  AddBook result is unchanged either way.
+- **Prefill order (§4.6):** local ISBN index → Open Library → Google
+  Books. Google-sourced description/cover are returned with
+  `description_transient` / `cover_transient` set and must not be
+  persisted.
+
+**Update (2026-11-15 push pass + 2026-11-16 PR #67 fix round).** The
+section above is the 2026-11-12 as-built record; the branch has since
+been rebased onto the merged PR 2 base, gained the F3 compensating
+`ai_runs` record (option C), and been through one review round:
+
+- **A sixth P4 migration exists:** `20261111130500_p4_review_aspects_
+  queue_security_invoker.sql` recreates `review_aspects_queue` WITH
+  (security_invoker = true) (finding F1). The owner's dashboard
+  procedure is now SIX migrations in filename order — see
+  `scripts/seed/README.md`. The exposure it closes exists from the
+  moment PR 2's migrations land, seeded or not.
+- **New real-DB gate step (F3):** `scripts/seed/run_gate.sh` runs
+  `verify_f3_rollback.ts` against the seeded scratch database — a
+  forced `listing_links` failure inside the shipped linker leaves
+  exactly one finished `error` ai_run and zero links (the unit suite
+  models the same behaviour against a stub). This is a NEW check
+  proving the F3 rollback / compensating-run behaviour; it is NOT
+  the parity harness's real-Postgres concurrency check for
+  `PurchaseBook`/`CheckoutCart` writes anticipated in the P3 section
+  above (Owner follow-ups item 2), which remains OPEN.
+- **Prefill hardening:** the public `LookupBookByISBN` Open Library
+  step now goes through the same throttled (≤3 req/s) + memoised
+  (10-minute, negatives included) lookup policy as the Path A
+  fallback; it previously called OL unthrottled.
+- **Work page / grid:** reviews carry `WorkReview.is_synthetic`
+  (demo reviews are badged and the aggregate labels them); reviews
+  name their edition (title/publisher/year); `Book.has_work` lets the
+  grid link only linked titles to work pages.
+- **Staging smoke (2026-11-16, read-only):** the deployed Worker
+  serves the app shell (GET / → 200), but every Connect RPC POST
+  tried — the four RPCs tried (`GetAvailableBooks`, `GetWork`,
+  `GetBookDetails`, `MerchantService/LookupBookByISBN`),
+  pre-existing P1–P3 RPCs among them — currently returns
+  HTTP 500 "Failed to start container: no container application
+  assigned to this Durable Object namespace". That is a staging
+  provisioning state (owner/dashboard side), not a PR 3 code
+  regression; RPC-level smoke resumes once the container assignment
+  is resolved. Detail in `scripts/seed/README.md`.

@@ -5,7 +5,8 @@ import { create } from "@bufbuild/protobuf";
 import { Code, ConnectError, type ServiceImpl } from "@connectrpc/connect";
 
 import { requireIdentity } from "../auth/basic";
-import type { QueryRunner } from "../db/client";
+import type { QueryRunner, TransactionRunner } from "../db/client";
+import { linkListingPathA, lookupLocalPrefill } from "../db/identity";
 import {
   createBook,
   deleteBook,
@@ -19,6 +20,12 @@ import {
   lookupBookByISBN,
 } from "../external/google-books";
 import { InvalidISBNError, normalizeISBN } from "../external/isbn";
+import {
+  lookupOlBookInfo,
+  type OlBookInfo,
+  type OlEditionInfo,
+} from "../external/open-library";
+import { canonicalISBN13 } from "../identity/isbn13";
 import {
   AddBookResponseSchema,
   Genre,
@@ -79,9 +86,36 @@ export function parseOptionalTime(field: string, value: string): string | null {
   return instant.toISOString();
 }
 
+/**
+ * Optional P4 wiring. When `identity` is present, AddBook runs one
+ * Path A pass over the new listing after the (P3-parity) upsert. When
+ * it is absent (unit tests, tooling), AddBook behaves exactly as it
+ * did at P3. `fetchFn` injects the HTTP implementation for the
+ * prefill lookups, as in the external clients' own options.
+ */
+export interface MerchantServiceDeps {
+  identity?: {
+    begin: TransactionRunner;
+    lookupEdition?: (isbn13: string) => Promise<OlEditionInfo | null>;
+  };
+  /**
+   * The throttled + memoised Open Library prefill lookup
+   * (createOpenLibraryBookInfoLookup: ≤3 req/s, 10-minute cache,
+   * negatives included). Production wiring (connect-app.ts) always
+   * supplies the shared per-isolate instance — LookupBookByISBN is a
+   * PUBLIC endpoint, and calling the raw lookupOlBookInfo from it
+   * would let a burst get the Worker's egress IP rate-limited by OL
+   * and break the Path A fallback too (PR #67 fix round item 2). When
+   * absent (unit seams), the raw lookup is used with `fetchFn`.
+   */
+  lookupBookInfo?: (isbn13: string) => Promise<OlBookInfo | null>;
+  fetchFn?: typeof fetch;
+}
+
 export function createMerchantService(
   run: QueryRunner,
   googleBooksApiKey: string | undefined,
+  deps: MerchantServiceDeps = {},
 ): Partial<ServiceImpl<typeof MerchantService>> {
   return {
     async addBook(req, ctx) {
@@ -101,6 +135,31 @@ export function createMerchantService(
           price: req.price,
           stockQuantity: req.stockQuantity,
         });
+        // Path A (§3.1): link the listing to its work, join-only, AFTER
+        // the upsert. Linking is derived data — a failure here must
+        // never fail the AddBook the merchant already succeeded at.
+        if (deps.identity !== undefined && book !== undefined) {
+          try {
+            await linkListingPathA(
+              {
+                run,
+                begin: deps.identity.begin,
+                lookupEdition: deps.identity.lookupEdition,
+              },
+              {
+                id: book.id,
+                isbn: req.isbn,
+                title: req.title,
+                author: req.author,
+              },
+            );
+          } catch (err) {
+            console.log(
+              `Path A linking failed for listing ${book.id}:`,
+              err,
+            );
+          }
+        }
         return create(AddBookResponseSchema, { book });
       } catch (err) {
         throw internal(err);
@@ -176,6 +235,13 @@ export function createMerchantService(
     // Public endpoint (see auth/basic.ts PUBLIC_PROCEDURES): validate
     // strictly, since the ISBN is embedded in an upstream search query,
     // and never echo upstream errors to unauthenticated callers.
+    // The §4.6 prefill, in the data rule's order (§4.1): the local
+    // ISBN index first, then one Open Library lookup, then live Google
+    // Books. Google is a transient display source only — its
+    // description and cover are flagged *_transient so the form shows
+    // them with attribution but never submits them (its Terms §5(e)
+    // forbids persisting them), and it is never an identity source.
+    // The endpoint stays public, exactly as at P1.
     async lookupBookByISBN(req) {
       let isbn: string;
       try {
@@ -186,9 +252,66 @@ export function createMerchantService(
         }
         throw err;
       }
+      const isbn13 = canonicalISBN13(isbn) ?? isbn;
 
+      // 1. Local ISBN index — the seeded catalogue already knows it.
       try {
-        const info = await lookupBookByISBN(isbn, { apiKey: googleBooksApiKey });
+        const local = await lookupLocalPrefill(run, isbn13);
+        if (local !== null) {
+          return create(LookupBookByISBNResponseSchema, {
+            title: local.title,
+            author: local.author,
+            publisher: local.publisher,
+            publicationYear: local.publicationYear,
+            pageCount: local.pageCount,
+            description: "",
+            // §4.5: OL covers are linked, never stored or proxied.
+            coverImageUrl: `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`,
+            categories: local.categories,
+            source: "local_index",
+            attribution: "",
+            descriptionTransient: false,
+            coverTransient: false,
+          });
+        }
+      } catch (err) {
+        console.log(`Local ISBN prefill for ${isbn13} failed:`, err);
+      }
+
+      // 2. Open Library — open data, attributed, submittable. Routed
+      // through the shared throttled + memoised lookup when wired
+      // (production always wires it; see MerchantServiceDeps).
+      try {
+        const ol =
+          deps.lookupBookInfo !== undefined
+            ? await deps.lookupBookInfo(isbn13)
+            : await lookupOlBookInfo(isbn13, { fetchFn: deps.fetchFn });
+        if (ol !== null) {
+          return create(LookupBookByISBNResponseSchema, {
+            title: ol.title,
+            author: ol.author,
+            publisher: ol.publisher,
+            publicationYear: ol.publicationYear,
+            pageCount: ol.pageCount,
+            description: ol.description,
+            coverImageUrl: ol.coverImageUrl,
+            categories: ol.categories,
+            source: "open_library",
+            attribution: "Open Library",
+            descriptionTransient: false,
+            coverTransient: false,
+          });
+        }
+      } catch (err) {
+        console.log(`Open Library prefill for ${isbn13} failed:`, err);
+      }
+
+      // 3. Google Books — transient display only (see header comment).
+      try {
+        const info = await lookupBookByISBN(isbn, {
+          apiKey: googleBooksApiKey,
+          fetchFn: deps.fetchFn,
+        });
         return create(LookupBookByISBNResponseSchema, {
           title: info.title,
           author: info.author,
@@ -198,6 +321,11 @@ export function createMerchantService(
           description: info.description,
           coverImageUrl: info.coverImageUrl,
           categories: info.categories,
+          source: "google_books",
+          attribution:
+            "Data from Google Books — for reference only; the description and cover are not saved with the book.",
+          descriptionTransient: true,
+          coverTransient: true,
         });
       } catch (err) {
         if (err instanceof BookNotFoundError) {

@@ -84,7 +84,8 @@ const BOOK_COLUMNS = `
 		SELECT b.id, b.store_id, b.isbn, b.title, b.author, b.genre, b.publisher,
 			b.publication_year, b.page_count, b.language, b.cover_image_url,
 			b.description, b.price, b.stock_quantity, b.total_sold, b.average_rating,
-			b.created_at, s.username AS store_name
+			b.created_at, b.is_synthetic, s.username AS store_name,
+			EXISTS (SELECT 1 FROM listing_links ll WHERE ll.listing_id = b.id) AS has_work
 		FROM books b
 		JOIN stores s ON b.store_id = s.id`;
 
@@ -108,6 +109,14 @@ export function bookFromRow(row: QueryRow): Book {
     averageRating: toNumber(row.average_rating),
     createdAt: formatTimestamp(row.created_at),
     storeName: toText(row.store_name),
+    // P4 (additive proto field 19): synthetic-fixture disclosure. The
+    // Go backend leaves it false (documented divergence, DEPLOY.md).
+    isSynthetic: row.is_synthetic === true,
+    // P4 (additive proto field 20): the listing is linked to a work, so
+    // a work page exists for it. Rows built from BOOK_RETURNING (the
+    // write paths) carry no has_work column and map to false — the
+    // flag is a list/detail-read concern (PR #67 fix round item 16).
+    hasWork: row.has_work === true,
   });
 }
 
@@ -369,7 +378,7 @@ export async function getPurchaseHistory(
 const BOOK_RETURNING = `
 		RETURNING id, store_id, isbn, title, author, genre, publisher, publication_year,
 			page_count, language, cover_image_url, description, price, stock_quantity,
-			total_sold, average_rating, created_at`;
+			total_sold, average_rating, created_at, is_synthetic`;
 
 /**
  * Looks up a store's username (the value every Book.store_name carries),

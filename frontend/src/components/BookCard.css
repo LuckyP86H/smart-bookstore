@@ -158,3 +158,23 @@
   outline-offset: 2px;
   transition: outline-color 0.4s ease;
 }
+
+/* P4: the title doubles as the work-page link when the host wires it. */
+.book-title-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.book-title-button:hover {
+  text-decoration: underline;
+}
+
+/* P4 §4.4 disclosure: synthetic listings are labelled, never passed
+   off as real inventory. The .synthetic-badge definition itself lives
+   in synthetic-badge.css — one shared definition for BookCard and
+   WorkPage (fix round 2026-11-16 dedupe). */

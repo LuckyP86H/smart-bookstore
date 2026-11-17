@@ -1,0 +1,86 @@
+.work-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1rem;
+  text-align: left;
+}
+
+.work-back {
+  margin-bottom: 1rem;
+}
+
+.work-title {
+  margin-bottom: 0.25rem;
+}
+
+.work-author {
+  color: var(--text-secondary, #666);
+  margin-top: 0;
+}
+
+.work-synthetic-banner {
+  border: 1px solid #d97706;
+  background: rgba(217, 119, 6, 0.12);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.work-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.work-category-chip {
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.work-editions,
+.work-offers,
+.work-reviews {
+  list-style: none;
+  padding-left: 0;
+}
+
+.work-editions li,
+.work-offers li,
+.work-reviews li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border-color, #e5e5e5);
+}
+
+.work-offer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.work-offer-store {
+  font-weight: 600;
+}
+
+.work-offer-price {
+  font-weight: 600;
+}
+
+.work-review-rating {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.work-review-meta {
+  color: var(--text-secondary, #666);
+  font-size: 0.9rem;
+}
+
+.work-empty {
+  color: var(--text-secondary, #666);
+}
+
+/* .synthetic-badge is defined once in synthetic-badge.css (shared
+   with BookCard; fix round 2026-11-16 dedupe) — not here. */

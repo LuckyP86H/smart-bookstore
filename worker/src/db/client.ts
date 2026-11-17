@@ -10,12 +10,19 @@ import postgres from "postgres";
 import type { Env } from "../env";
 
 /** A single SQL parameter value. */
-// Plain objects are admitted for jsonb columns (ai_runs input/output):
-// postgres.js serialises an object parameter to JSON itself, while a
-// pre-stringified JSON string is encoded AGAIN and lands in the column
-// as a JSON string scalar instead of an object — the double-encoding
-// the P4 gate work caught in ai_runs payloads. Pass objects, never
-// strings, for jsonb parameters through this seam.
+// P4: string[]/bigint[] added for the identity store's array columns
+// (listing_facets.author_keys, identity_events.evidence_ids) —
+// postgres.js binds JS arrays to Postgres arrays natively. Plain
+// objects added for jsonb columns (ai_runs input/output, evidence
+// bands, identity_events states/manifest): postgres.js serialises an
+// object parameter to JSON itself, while a pre-stringified JSON
+// string is encoded AGAIN and lands as a JSON string scalar — the
+// double-encoding the P4 gate work caught in ai_runs payloads and
+// the PR 3 gate caught in evidence (see PR3-BUILD-LOG D3-18). Pass
+// objects, never strings, for jsonb parameters through this seam.
+// (Rebase 2026-11-15: the merged base and PR 3 each widened this type
+// with Record<string, unknown> for the same reason; converged here
+// to exactly one copy, keeping PR 3's array members.)
 export type QueryValue =
   | string
   | number
@@ -23,6 +30,8 @@ export type QueryValue =
   | boolean
   | Date
   | null
+  | string[]
+  | bigint[]
   | Record<string, unknown>;
 
 /** One result row, keyed by column name (aliases in queries.ts apply). */
